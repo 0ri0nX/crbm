@@ -2,6 +2,7 @@
 #define MATRIX_H
 
 #include <cublas_v2.h>
+#include <curand.h>
 
 namespace YAMATH
 {
@@ -158,6 +159,19 @@ namespace YAMATH
 
                     Init(inX, inY);
                 }
+            }
+
+            void Rand(unsigned long long inSeed = 0)
+            {
+                // Create a pseudo-random number generator
+                curandGenerator_t prng;
+                curandCreateGenerator(&prng, CURAND_RNG_PSEUDO_DEFAULT);
+
+                // Set the seed for the random number generator using the system clock
+                curandSetPseudoRandomGeneratorSeed(prng, inSeed != 0 ? inSeed : (unsigned long long) clock());
+
+                // Fill the array with random numbers on the device
+                curandGenerateUniform(prng, m_Data, m_X*m_Y);
             }
 
             MatrixGpu &operator=(const OperationGpu &inOperation);

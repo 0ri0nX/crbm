@@ -83,8 +83,9 @@ int main(int argc, char** argv)
     delete tCpu;
 
     MatrixGpu w(x.getX(), t.getY()); //init weights
+    w.Rand();
 
-    w = x * t;
+    //w = x * t;
 
     //float alpha = 1.0f;
     //float beta = 0.0f;
@@ -93,7 +94,8 @@ int main(int argc, char** argv)
     //        x.getX(), t.getY(), x.getY(),
     //        &alpha, x.getData(), x.getX(), t.getData(), t.getX(), &beta, w.getData(), w.getX());
 
-/*
+
+    /*
     for(int i = 0; i < 1000; ++i)
     {
         dev::Matrix y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
@@ -113,7 +115,8 @@ int main(int argc, char** argv)
         dev::Matrix dW = x.trans * e; // == (y - dataB)*dataA ; // elementwise
         
         w += alpha*dW;
-    }*/
+    }
+    */
 
     MatrixCpu res = w;
 

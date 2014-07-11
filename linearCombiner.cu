@@ -68,6 +68,8 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    typedef MatrixGpu Mat;
+
     MatrixCpu *xCpu = new MatrixCpu();
     MatrixCpu *tCpu = new MatrixCpu();
     loadMatrix(*xCpu, argv[1], true);
@@ -76,13 +78,13 @@ int main(int argc, char** argv)
     ms(*tCpu);
 
     cout << "Copy to GPU ..." << endl;
-    MatrixGpu x = *xCpu;
-    MatrixGpu t = *tCpu;
+    Mat x = *xCpu;
+    Mat t = *tCpu;
 
     delete xCpu;
     delete tCpu;
 
-    MatrixGpu w(x.getX(), t.getY()); //init weights
+    Mat w(x.getX(), t.getY()); //init weights
     w.Rand();
 
     //w = x * t;
@@ -95,10 +97,12 @@ int main(int argc, char** argv)
     //        &alpha, x.getData(), x.getX(), t.getData(), t.getX(), &beta, w.getData(), w.getX());
 
 
-    /*
+    
     for(int i = 0; i < 1000; ++i)
     {
-        dev::Matrix y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        MatrixGpu y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        
+        /*
         dev::Matrix e = 0.5f*(t - y)^2; //yDiff.shape = dataB.shape
 
         if(i % 10 == 0)
@@ -115,8 +119,9 @@ int main(int argc, char** argv)
         dev::Matrix dW = x.trans * e; // == (y - dataB)*dataA ; // elementwise
         
         w += alpha*dW;
+        */
     }
-    */
+    
 
     MatrixCpu res = w;
 

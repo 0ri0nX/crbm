@@ -140,6 +140,7 @@ namespace YAMATH
 
             MatrixGpu(const MatrixGpu &inMatrix);
             MatrixGpu(const MatrixCpu &inMatrix);
+            MatrixGpu(const OperationGpu &inOperation);
 
             ~MatrixGpu(void)
             {
@@ -277,6 +278,21 @@ namespace YAMATH
             inOperation.Execute(*this, handle);
 
             return *this;
+        }
+
+    MatrixGpu::MatrixGpu(const OperationGpu &inOperation)
+        {
+            int x, y;
+            inOperation.GetResultSize(x, y);
+            Init(x, y);
+
+            cublasHandle_t handle;
+            cublasStatus_t stat;
+        
+            stat = cublasCreate(&handle);
+            assert (stat == CUBLAS_STATUS_SUCCESS);
+
+            inOperation.Execute(*this, handle);
         }
 
     OperationMatrixMultiply MatrixGpu::operator*(const MatrixGpu &inB) const

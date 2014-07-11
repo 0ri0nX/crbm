@@ -49,6 +49,14 @@ void ms(const MatrixCpu &inM)
     //inM.Save(cout);
 }
 
+void msg(char * inMsg, const MatrixGpu &inM)
+{
+    cout << inMsg << ":" << endl;
+    MatrixCpu x = inM;
+    x.Save(cout);
+    cout << endl;
+}
+
 
 int main(int argc, char** argv)
 {
@@ -79,13 +87,17 @@ int main(int argc, char** argv)
 
     cout << "Copy to GPU ..." << endl;
     Mat x = *xCpu;
+    msg("x", x);
+
     Mat t = *tCpu;
+    msg("t", t);
 
     delete xCpu;
     delete tCpu;
 
-    Mat w(x.getX(), t.getY()); //init weights
+    Mat w(x.getY(), t.getY()); //init weights
     w.Rand();
+    msg("w", w);
 
     //w = x * t;
 
@@ -98,11 +110,22 @@ int main(int argc, char** argv)
 
 
     
-    for(int i = 0; i < 1000; ++i)
+    for(int i = 0; i < 1; ++i)
     {
-        MatrixGpu y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
-        
+        Mat y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        msg("y=x*w", y);
+
+        Mat e = t - y;
+        msg("e=t-y", e);
+
+        e ^= 2.0f;//elementwise
+        msg("e^=2", e);
+
+        e *= 0.5f;
+        msg("e*=0.5f", e);
+
         /*
+        Mat y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
         dev::Matrix e = 0.5f*(t - y)^2; //yDiff.shape = dataB.shape
 
         if(i % 10 == 0)
@@ -122,7 +145,7 @@ int main(int argc, char** argv)
         */
     }
     
-
+/*
     MatrixCpu res = w;
 
     ms(res);
@@ -130,6 +153,6 @@ int main(int argc, char** argv)
     //res.Save(cout);
 
     cout << "done" << endl;
-
+*/
     return 0;
 }

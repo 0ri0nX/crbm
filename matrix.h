@@ -19,10 +19,23 @@ namespace YAMATH
         cudaFree(inFloatArray);
     }
 
+    enum EFunctionElementwise
+    {
+        EFE_Square,
+        EFE_Sqrt,
+        EFE_Pow,
+        EFE_ScalarMultiply,
+    };
+
+    //forwards
     class MatrixCpu;
     class MatrixGpu;
     class OperationGpu;
     class OperationMatrixMultiply;
+    class OperationMatrixAdd;
+    class OperationMatrixSubstract;
+    class OperationMatrixApplyElementwise;
+
 
     class MatrixCpu//column-first layout
     {
@@ -178,6 +191,11 @@ namespace YAMATH
             MatrixGpu &operator=(const OperationGpu &inOperation);
 
             OperationMatrixMultiply operator*(const MatrixGpu &inB) const;
+            OperationMatrixAdd operator+(const MatrixGpu &inB) const;
+            OperationMatrixSubstract operator-(const MatrixGpu &inB) const;
+
+            MatrixGpu &operator^=(float inExponent);
+            MatrixGpu &operator*=(float inVal);
 
         protected:
             void Init(int inX, int inY)
@@ -206,11 +224,13 @@ namespace YAMATH
         protected:
             static const float m_Zero;
             static const float m_One;
+            static const float m_MinusOne;
 
     };
 
     const float OperationGpu::m_Zero = 0.0f;
     const float OperationGpu::m_One = 1.0f;
+    const float OperationGpu::m_MinusOne = -1.0f;
 
     class OperationMatrixMultiply : public OperationGpu
     {
@@ -236,6 +256,138 @@ namespace YAMATH
                 cublasSgemm(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
                         m_A.getX(), m_B.getY(), m_A.getY(),
                         &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), m_A.getX());
+            }
+
+        protected:
+            const MatrixGpu& m_A;
+            const MatrixGpu& m_B;
+    };
+
+    class OperationMatrixAdd : public OperationGpu
+    {
+        public:
+            OperationMatrixAdd(const MatrixGpu& inA, const MatrixGpu& inB)
+                : m_A(inA), m_B(inB)
+            {
+                assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
+            }
+
+            virtual void GetResultSize(int &outX, int &outY) const
+            {
+                outX = m_A.getX();
+                outY = m_A.getY();
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            {
+                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+
+                outMatrix.Reset(m_A.getX(), m_A.getY());
+
+                cublasSgeam(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
+                        m_A.getX(), m_A.getY(),
+                        &m_One, m_A.getDataConst(), m_A.getX(),
+                        &m_One, m_B.getDataConst(), m_B.getX(),
+                        outMatrix.getDataConst(), m_A.getX());
+            }
+
+        protected:
+            const MatrixGpu& m_A;
+            const MatrixGpu& m_B;
+    };
+
+    __global__ void applyFunction(float *outTarget, float *inSource, int N, EFunctionElementwise inType, float inParam1)
+        {
+            /* which element does this compute? */
+            int tid = blockDim.x * blockIdx.x + threadIdx.x;
+        
+            /* if valid, squre the array element */
+            if (tid < N)
+            {
+                switch(inType)
+                {
+                    case EFE_Square:
+                        outTarget[tid] = (inSource[tid]*inSource[tid]);
+                        break;
+                    case EFE_Sqrt:
+                        outTarget[tid] = sqrtf(inSource[tid]);
+                        break;
+                    case EFE_Pow:
+                        outTarget[tid] = powf(inSource[tid], inParam1);
+                        break;
+                    case EFE_ScalarMultiply:
+                        outTarget[tid] = inParam1*inSource[tid];
+                        break;
+                }
+            }
+        }
+    
+    void funcElementwise(MatrixGpu &inOutMatrix, EFunctionElementwise inType, float inParam1 = 0.0f)
+        {
+            static int ThreadsPerBlock = 256;
+
+            dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
+
+            int num = inOutMatrix.getX()*inOutMatrix.getY();
+
+            dim3 threadsPerGrid((num - 1) / ThreadsPerBlock + 1, 1, 1);
+
+            applyFunction<<<threadsPerGrid, threadsPerBlock>>>(inOutMatrix.getData(), inOutMatrix.getData(), num, inType, inParam1);
+            //gpuErrCheck( cudaPeekAtLastError() );
+            //gpuErrCheck( cudaDeviceSynchronize() );
+        }
+
+    class OperationMatrixApplyElementwise : public OperationGpu
+    {
+        public:
+            OperationMatrixApplyElementwise(MatrixGpu& inA, EFunctionElementwise inType, float inParam1)
+                : m_A(inA), m_Type(inType), m_Param1(inParam1)
+            {
+            }
+
+            virtual void GetResultSize(int &outX, int &outY) const
+            {
+                outX = m_A.getX();
+                outY = m_A.getY();
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            {
+                funcElementwise(m_A, m_Type, m_Param1);
+            }
+
+        protected:
+            MatrixGpu& m_A;
+            EFunctionElementwise m_Type;
+            float m_Param1;
+    };
+
+    class OperationMatrixSubstract : public OperationGpu
+    {
+        public:
+            OperationMatrixSubstract(const MatrixGpu& inA, const MatrixGpu& inB)
+                : m_A(inA), m_B(inB)
+            {
+                assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
+            }
+
+            virtual void GetResultSize(int &outX, int &outY) const
+            {
+                outX = m_A.getX();
+                outY = m_A.getY();
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            {
+                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+
+                outMatrix.Reset(m_A.getX(), m_A.getY());
+
+                cublasSgeam(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
+                        m_A.getX(), m_A.getY(),
+                        &m_One, m_A.getDataConst(), m_A.getX(),
+                        &m_MinusOne, m_B.getDataConst(), m_B.getX(),
+                        outMatrix.getDataConst(), m_A.getX());
             }
 
         protected:
@@ -299,6 +451,38 @@ namespace YAMATH
         {
             return OperationMatrixMultiply(*this, inB);
         }
+
+    OperationMatrixAdd MatrixGpu::operator+(const MatrixGpu &inB) const
+        {
+            return OperationMatrixAdd(*this, inB);
+        }
+
+    OperationMatrixSubstract MatrixGpu::operator-(const MatrixGpu &inB) const
+        {
+            return OperationMatrixSubstract(*this, inB);
+        }
+
+    MatrixGpu &MatrixGpu::operator^=(float inExponent)
+        {
+            if(inExponent == 2.0f)
+            {
+                return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f));
+            }
+            else if(inExponent == 0.5f)
+            {
+                return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Sqrt, 0.0f));
+            }
+            else
+            {
+                return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Pow, inExponent));
+            }
+        }
+
+    MatrixGpu &MatrixGpu::operator*=(float inVal)
+        {
+            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal));
+        }
+
 
 }
 

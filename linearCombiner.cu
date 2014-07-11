@@ -43,9 +43,9 @@ void saveMatrix(MatrixCpu &inM, char* filename)
     f.close();
 }
 
-void ms(const MatrixCpu &inM)
+void ms(char * inMsg, const MatrixGpu &inM)
 {
-    cout << "x:" << inM.getX() << ", y:" << inM.getY() << endl;
+    cout << inMsg << " - x:" << inM.getX() << ", y:" << inM.getY() << endl;
     //inM.Save(cout);
 }
 
@@ -80,24 +80,20 @@ int main(int argc, char** argv)
 
     MatrixCpu *xCpu = new MatrixCpu();
     MatrixCpu *tCpu = new MatrixCpu();
-    loadMatrix(*xCpu, argv[1], true);
-    ms(*xCpu);
-    loadMatrix(*tCpu, argv[2]);
-    ms(*tCpu);
-
-    cout << "Copy to GPU ..." << endl;
+    loadMatrix(*xCpu, argv[1]);
     Mat x = *xCpu;
-    msg("x", x);
+    ms("x", x);
 
+    loadMatrix(*tCpu, argv[2]);
     Mat t = *tCpu;
-    msg("t", t);
+    ms("t", t);
 
     delete xCpu;
     delete tCpu;
 
     Mat w(x.getY(), t.getY()); //init weights
     w.Rand();
-    msg("w", w);
+    //msg("w", w);
 
     //w = x * t;
 
@@ -108,21 +104,44 @@ int main(int argc, char** argv)
     //        x.getX(), t.getY(), x.getY(),
     //        &alpha, x.getData(), x.getX(), t.getData(), t.getX(), &beta, w.getData(), w.getX());
 
+    Mat y, e, suma, dw, dty;
 
     
-    for(int i = 0; i < 1; ++i)
+    for(int i = 0; i < 1000; ++i)
     {
-        Mat y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
-        msg("y=x*w", y);
+        y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        //ms("y=x*w", y);
 
-        Mat e = t - y;
-        msg("e=t-y", e);
+        dty = t - y;
+        //ms("e=t-y", e);
+
+        e = dty;
 
         e ^= 2.0f;//elementwise
-        msg("e^=2", e);
+        //msg("e^=2", e);
 
         e *= 0.5f;
-        msg("e*=0.5f", e);
+        //msg("e*=0.5f", e);
+
+        if(i % 1 == 0)
+        {
+            suma = e.Sum();
+            msg("sum", suma);
+            //cout << "error:" << ee << endl;
+            //if(ee < 0.001f)
+            //{
+            //    break;
+            //}
+        }
+
+        dw = (x^"T") * dty;
+        //msg("dw=x^t * e", dw);
+
+        dw*= 0.00000000001f;
+        //msg("dw*= 0.01", dw);
+
+        w = w - dw;
+        //msg("w = w + dw", w);
 
         /*
         Mat y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)

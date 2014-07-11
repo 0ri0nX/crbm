@@ -27,6 +27,13 @@ namespace YAMATH
         EFE_ScalarMultiply,
     };
 
+    enum EAggregate
+    {
+        EA_Sum,
+        EA_Min,
+        EA_Max,
+    };
+
     //forwards
     class MatrixCpu;
     class MatrixGpu;
@@ -35,7 +42,8 @@ namespace YAMATH
     class OperationMatrixAdd;
     class OperationMatrixSubstract;
     class OperationMatrixApplyElementwise;
-
+    class OperationMatrixAggregate;
+    class OperationMatrixTransform;
 
     class MatrixCpu//column-first layout
     {
@@ -194,6 +202,12 @@ namespace YAMATH
             OperationMatrixAdd operator+(const MatrixGpu &inB) const;
             OperationMatrixSubstract operator-(const MatrixGpu &inB) const;
 
+            OperationMatrixAggregate Max(void) const;
+            OperationMatrixAggregate Min(void) const;
+            OperationMatrixAggregate Sum(void) const;
+
+            OperationMatrixTransform operator^(const char *inType) const;
+
             MatrixGpu &operator^=(float inExponent);
             MatrixGpu &operator*=(float inVal);
 
@@ -235,32 +249,48 @@ namespace YAMATH
     class OperationMatrixMultiply : public OperationGpu
     {
         public:
-            OperationMatrixMultiply(const MatrixGpu& inA, const MatrixGpu& inB)
-                : m_A(inA), m_B(inB)
+            OperationMatrixMultiply(const MatrixGpu& inA, const MatrixGpu& inB, bool inTransposeA = false, bool inTransposeB = false)
+                : m_A(inA), m_B(inB), m_TransA(inTransposeA), m_TransB(inTransposeB)
             {
-                assert (inA.getY() == inB.getX());
+                int kA = !m_TransA ? m_A.getY() : m_A.getX();
+                int kB = !m_TransB ? m_B.getX() : m_B.getY();
+                assert(kA == kB);
             }
 
             virtual void GetResultSize(int &outX, int &outY) const
             {
-                outX = m_A.getX();
-                outY = m_B.getY();
+                outX = !m_TransA ? m_A.getX() : m_A.getY();
+                outY = !m_TransB ? m_B.getY() : m_B.getX();
             }
 
             virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
-                outMatrix.Reset(m_A.getX(), m_B.getY());
+                int x = !m_TransA ? m_A.getX() : m_A.getY();
+                int y = !m_TransB ? m_B.getY() : m_B.getX();
+                int kA = !m_TransA ? m_A.getY() : m_A.getX();
+                int kB = !m_TransB ? m_B.getX() : m_B.getY();
 
-                cublasSgemm(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-                        m_A.getX(), m_B.getY(), m_A.getY(),
-                        &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), m_A.getX());
+                //cout << "TA:" << m_TransA << ", TB:" << m_TransB << endl;
+                assert(kA == kB);
+
+                outMatrix.Reset(x, y);
+
+                cublasSgemm(inHandle, !m_TransA ? CUBLAS_OP_N : CUBLAS_OP_T, !m_TransB ? CUBLAS_OP_N : CUBLAS_OP_T,
+                        x, y, kA,
+                        &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), x);
+
+                //cublasSgemm(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
+                //        m_A.getX(), m_B.getY(), m_A.getY(),
+                //        &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), m_A.getX());
             }
 
         protected:
             const MatrixGpu& m_A;
             const MatrixGpu& m_B;
+            bool m_TransA;
+            bool m_TransB;
     };
 
     class OperationMatrixAdd : public OperationGpu
@@ -294,6 +324,76 @@ namespace YAMATH
         protected:
             const MatrixGpu& m_A;
             const MatrixGpu& m_B;
+    };
+
+    class OperationMatrixTransform : public OperationGpu
+    {
+        public:
+            OperationMatrixTransform(const MatrixGpu& inA, const char *inType)
+                : m_A(inA), m_Type(inType)
+            {
+                //only transpose now
+                assert(inType[0] == 'T' && inType[1] == '\0');
+            }
+
+            virtual void GetResultSize(int &outX, int &outY) const
+            {
+                outX = m_A.getY();
+                outY = m_A.getX();
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            {
+                assert(0);
+            }
+
+            OperationMatrixMultiply operator*(const MatrixGpu &inB) const;
+
+        protected:
+            const MatrixGpu& m_A;
+            bool m_Type;
+    };
+    class OperationMatrixAggregate : public OperationGpu
+    {
+        public:
+            OperationMatrixAggregate(const MatrixGpu& inA, EAggregate inType)
+                : m_A(inA), m_Type(inType)
+            {
+            }
+
+            virtual void GetResultSize(int &outX, int &outY) const
+            {
+                outX = 1;
+                outY = 1;
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            {
+                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+
+                outMatrix.Reset(1, 1);
+
+                if(m_Type == EA_Sum)
+                {
+                    cublasSetPointerMode(inHandle, CUBLAS_POINTER_MODE_DEVICE);
+                    cublasSasum(inHandle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, outMatrix.getData());
+                }
+                else if(m_Type == EA_Min)
+                {
+                    assert(0);
+                    //cublasIsamin(inHandle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, outMatrix.getData());
+                }
+                else if(m_Type == EA_Max)
+                {
+                    assert(0);
+                    //cublasIsamax(inHandle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, outMatrix.getData());
+                }
+
+            }
+
+        protected:
+            const MatrixGpu& m_A;
+            const EAggregate m_Type;
     };
 
     __global__ void applyFunction(float *outTarget, float *inSource, int N, EFunctionElementwise inType, float inParam1)
@@ -429,6 +529,8 @@ namespace YAMATH
 
             inOperation.Execute(*this, handle);
 
+            cublasDestroy(handle);
+
             return *this;
         }
 
@@ -452,6 +554,11 @@ namespace YAMATH
             return OperationMatrixMultiply(*this, inB);
         }
 
+    OperationMatrixMultiply OperationMatrixTransform::operator*(const MatrixGpu &inB) const
+        {
+            return OperationMatrixMultiply(m_A, inB, m_Type, false);
+        }
+
     OperationMatrixAdd MatrixGpu::operator+(const MatrixGpu &inB) const
         {
             return OperationMatrixAdd(*this, inB);
@@ -460,6 +567,22 @@ namespace YAMATH
     OperationMatrixSubstract MatrixGpu::operator-(const MatrixGpu &inB) const
         {
             return OperationMatrixSubstract(*this, inB);
+        }
+    OperationMatrixAggregate MatrixGpu::Max(void) const
+        {
+            return OperationMatrixAggregate(*this, EA_Max);
+        }
+    OperationMatrixAggregate MatrixGpu::Min(void) const
+        {
+            return OperationMatrixAggregate(*this, EA_Min);
+        }
+    OperationMatrixAggregate MatrixGpu::Sum(void) const
+        {
+            return OperationMatrixAggregate(*this, EA_Sum);
+        }
+    OperationMatrixTransform MatrixGpu::operator^(const char *inType) const
+        {
+            return OperationMatrixTransform(*this, inType);
         }
 
     MatrixGpu &MatrixGpu::operator^=(float inExponent)

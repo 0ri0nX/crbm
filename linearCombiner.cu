@@ -43,27 +43,127 @@ void saveMatrix(MatrixCpu &inM, char* filename)
     f.close();
 }
 
-void ms(char * inMsg, const MatrixGpu &inM)
+void msgG(char * inMsg, const MatrixGpu &inM)
 {
-    cout << inMsg << " - x:" << inM.getX() << ", y:" << inM.getY() << endl;
-    //inM.Save(cout);
-}
-
-void msg(char * inMsg, const MatrixGpu &inM)
-{
-    cout << inMsg << ":" << endl;
+    cout << "GPU: " << inMsg << ":" << endl;
     MatrixCpu x = inM;
-    x.Save(cout);
+    if(x.getX()*x.getY() > 400)
+    {
+        cout << x.getX() << " x " << x.getY() << endl;
+        cout << "[ " << (x.getData()[0]) << " ... " << (x.getData()[x.getX()*x.getY()-1]) << " ]" << endl;
+    }
+    else
+    {
+        x.Save(cout);
+    }
     cout << endl;
 }
+
+void msgC(char * inMsg, const MatrixCpu &inM)
+{
+    cout << "CPU: " << inMsg << ":" << endl;
+    const MatrixCpu &x = inM;
+    if(x.getX()*x.getY() > 100)
+    {
+        cout << x.getX() << " x " << x.getY() << endl;
+        cout << "[ " << (x.getDataConst()[0]) << " ... " << (x.getDataConst()[x.getX()*x.getY()-1]) << " ]" << endl;
+    }
+    else
+    {
+        x.Save(cout);
+    }
+    cout << endl;
+}
+
+void ms(char * inMsg, const MatrixGpu &inM)
+{
+    //msgG(inMsg, inM);
+}
+
+
+void testGpu(int x, int y)
+{
+    typedef MatrixGpu M;
+    typedef MatrixCpu MC;
+    
+    cout << "GPU -----------" << endl;
+
+    MC ac(x, y);
+    for(int i = 0; i < ac.getX()*ac.getY(); ++i)
+    {
+        ac.getData()[i] = float(i);
+    }
+    M a = ac;
+    msgG("a - init", a);
+
+    //a = 11.0f;
+    //msgG("a=11.0f", a);
+
+    M b = a.AbsSum();
+    msgG("b=a.AbsSum()", b);
+
+    MC cc(y, 3);
+    for(int i = 0; i < cc.getX()*cc.getY(); ++i)
+    {
+        cc.getData()[i] = 0.0f;
+    }
+    cc.getData()[0] = 1.0f;
+    cc.getData()[y+1] = 1.0f;
+    cc.getData()[2*y+2] = 1.0f;
+    M c = cc;
+    msgG("c", c);
+
+    M d = a*c;
+    msgG("d=a*c", d);
+
+    
+}
+
+void testCpu(int x, int y)
+{
+    typedef MatrixCpu M;
+
+    cout << "CPU -----------" << endl;
+    
+    M a(x, y);
+    msgC("a - init", a);
+
+    //a = 11.0f;
+    for(int i = 0; i < a.getX()*a.getY(); ++i)
+    {
+        a.getData()[i] = 11;
+    }
+    msgC("a=11.0f", a);
+
+    M b(1,1);
+    float sum = 0.0f;
+    for(int i = 0; i < a.getX()*a.getY(); ++i)
+    {
+        sum += a.getData()[i];
+    }
+    b.getData()[0] = sum;
+    msgC("sum=a.AbsSum()", b);
+}
+
+//const float x1[] = {1.0f, 0.0f, 0.0f};
+//const float t1[] = {1.0f, 0.0f};
+//
+//const float x2[] = {1.0f, 0.0f, 1.0f};
+//const float t2[] = {1.0f, 0.0f};
+//
+//const float x3[] = {1.0f, 1.0f, 0.0f};
+//const float t3[] = {1.0f, 0.0f};
+//
+//const float x4[] = {1.0f, 1.0f, 1.0f};
+//const float t4[] = {0.0f, 1.0f};
 
 
 int main(int argc, char** argv)
 {
-    if(argc != 4)
+    if(argc != 5)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << "image-feature-matrix w2vec-matrix output-weights" << endl;
+        cout << argv[0] << " input-vector-file target-vector-file output-weights-file learning-speed" << endl;
         exit(1);
     }
 
@@ -76,13 +176,19 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    float lSpeed = atof(argv[4]);
+
     typedef MatrixGpu Mat;
+
 
     MatrixCpu *xCpu = new MatrixCpu();
     MatrixCpu *tCpu = new MatrixCpu();
+
     loadMatrix(*xCpu, argv[1]);
     Mat x = *xCpu;
     ms("x", x);
+    //Mat xt = x^"T";
+    //ms("x^T", xt);
 
     loadMatrix(*tCpu, argv[2]);
     Mat t = *tCpu;
@@ -91,9 +197,24 @@ int main(int argc, char** argv)
     delete xCpu;
     delete tCpu;
 
+    //Mat m;
+    //m = x.AbsMax();
+    //ms("absmax(x)", m);
+    //m = x.AbsMin();
+    //ms("absmin(x)", m);
+
+    //m = t.AbsMax();
+    //ms("absmax(t)", m);
+    //m = t.AbsMin();
+    //ms("absmin(t)", m);
+
+    //x = MatrixCpu(1, 3, x1);
+    //t = MatrixCpu(1, 2, t1);
+
     Mat w(x.getY(), t.getY()); //init weights
-    w.Rand();
-    //msg("w", w);
+    //w.Rand();
+    w = 0.0f;
+    ms("w", w);
 
     //w = x * t;
 
@@ -107,26 +228,50 @@ int main(int argc, char** argv)
     Mat y, e, suma, dw, dty;
 
     
-    for(int i = 0; i < 1000; ++i)
+    for(int i = 0; i < 100000; ++i)
     {
+        //switch(i%4)
+        //{
+        //    case 0:
+        //        x = MatrixCpu(1, 3, x1);
+        //        t = MatrixCpu(1, 2, t1);
+        //        break;
+        //    case 1:
+        //        x = MatrixCpu(1, 3, x2);
+        //        t = MatrixCpu(1, 2, t2);
+        //        break;
+        //    case 2:
+        //        x = MatrixCpu(1, 3, x3);
+        //        t = MatrixCpu(1, 2, t3);
+        //        break;
+        //    case 3:
+        //        x = MatrixCpu(1, 3, x4);
+        //        t = MatrixCpu(1, 2, t4);
+        //        break;
+        //    default:
+        //        exit(0);
+        //}
+        //ms("x", x);
+        //ms("t", t);
         y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
-        //ms("y=x*w", y);
+        ms("y=x*w", y);
 
         dty = t - y;
-        //ms("e=t-y", e);
+        ms("dty=t-y", dty);
 
         e = dty;
+        //ms("e=dty", e);
 
         e ^= 2.0f;//elementwise
-        //msg("e^=2", e);
+        //ms("e^=2", e);
 
         e *= 0.5f;
-        //msg("e*=0.5f", e);
+        //ms("e*=0.5f", e);
 
-        if(i % 1 == 0)
+        if(i % 10 == 0)
         {
-            suma = e.Sum();
-            msg("sum", suma);
+            suma = e.AbsSum();
+            msgG("abssum", suma);
             //cout << "error:" << ee << endl;
             //if(ee < 0.001f)
             //{
@@ -135,43 +280,46 @@ int main(int argc, char** argv)
         }
 
         dw = (x^"T") * dty;
-        //msg("dw=x^t * e", dw);
+        //ms("dty", dty);
+        ms("dw=x^t * dty", dw);
 
-        dw*= 0.00000000001f;
-        //msg("dw*= 0.01", dw);
+        //dw*= 0.001f * 1.0f/(x.getX()*x.getY());
+        //ms("dw*= 000.1 * 1.0f/(x.getX()*x.getY())", dw);
 
-        w = w - dw;
-        //msg("w = w + dw", w);
+        dw*= lSpeed;
+        ms("dw*= lSpeed", dw);
 
-        /*
-        Mat y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
-        dev::Matrix e = 0.5f*(t - y)^2; //yDiff.shape = dataB.shape
+        w = w + dw;
+        ms("w = w + dw", w);
 
-        if(i % 10 == 0)
-        {
-            float ee = dev::sumSquared(e); // ee = sum(e^2) elementwise squared sum
-            cout << "error:" << ee << endl;
-            if(ee < 0.001f)
-            {
-                break;
-            }
-        }
-
-        //(t - y)dFi*xi => (t - y)*xi
-        dev::Matrix dW = x.trans * e; // == (y - dataB)*dataA ; // elementwise
         
-        w += alpha*dW;
-        */
-    }
-    
-/*
+        //Mat y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        //dev::Matrix e = 0.5f*(t - y)^2; //yDiff.shape = dataB.shape
+
+        //if(i % 10 == 0)
+        //{
+        //    float ee = dev::sumSquared(e); // ee = sum(e^2) elementwise squared sum
+        //    cout << "error:" << ee << endl;
+        //    if(ee < 0.001f)
+        //    {
+        //        break;
+        //    }
+        //}
+
+        ////(t - y)dFi*xi => (t - y)*xi
+        //dev::Matrix dW = x.trans * e; // == (y - dataB)*dataA ; // elementwise
+        //
+        //w += alpha*dW;
+        //cout << "]" << endl; 
+    }    
+
     MatrixCpu res = w;
 
-    ms(res);
+    msgC("res=", res);
     saveMatrix(res, argv[3]);
     //res.Save(cout);
 
     cout << "done" << endl;
-*/
     return 0;
+
 }

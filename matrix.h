@@ -3,6 +3,8 @@
 
 #include <cublas_v2.h>
 #include <curand.h>
+#include <limits>
+#include <float.h>
 
 namespace YAMATH
 {
@@ -53,6 +55,15 @@ namespace YAMATH
         EA_AbsSum,
         EA_AbsMin,
         EA_AbsMax,
+        EA_Sum,
+    };
+
+    enum EFunctionBinaryAssociative
+    {
+        EFB_Plus,
+        EFB_Multiply,
+        EFB_Max,
+        EFB_Min,
     };
 
     //forwards
@@ -65,6 +76,7 @@ namespace YAMATH
     class OperationMatrixApplyElementwise;
     class OperationMatrixAggregate;
     class OperationMatrixTransform;
+    class OperationBinaryAssociative;
 
     class MatrixCpu//column-first layout
     {
@@ -237,6 +249,10 @@ namespace YAMATH
             OperationMatrixAggregate AbsMax(void) const;
             OperationMatrixAggregate AbsMin(void) const;
             OperationMatrixAggregate AbsSum(void) const;
+            OperationBinaryAssociative Sum(void) const;
+            OperationBinaryAssociative Min(void) const;
+            OperationBinaryAssociative Max(void) const;
+            OperationBinaryAssociative Multiply(void) const;
 
             OperationMatrixTransform operator^(const char *inType) const;
 
@@ -324,6 +340,116 @@ namespace YAMATH
             bool m_TransA;
             bool m_TransB;
     };
+
+    __global__ void parallelAssociativeOperator(const float *inData, int inN, EFunctionBinaryAssociative inType, float *outBlockResults)
+    {
+        extern __shared__ float sd[];
+
+        unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+        float myData;
+        switch(inType)
+        {
+        case EFB_Plus:
+            myData = 0.0f;;
+            break;
+        case EFB_Multiply:
+            myData = 1.0f;
+            break;
+        case EFB_Max:
+            //myData = -std::numeric_limits<float>::max();
+            myData = -FLT_MAX;
+            break;
+        case EFB_Min:
+            //myData = std::numeric_limits<float>::max();
+            myData = FLT_MAX;
+            break;
+        }
+
+        //load to shared memory
+        if(idx < inN)
+        {
+            myData = inData[idx];
+        }
+
+        sd[threadIdx.x] = myData;
+
+        for(int offset = blockDim.x / 2; offset > 0; offset >>= 1)
+        {
+            __syncthreads();
+
+            if(threadIdx.x < offset)
+            {
+                switch(inType)
+                {
+//                case sd[threadIdx.x] += sd[threadIdx.x + offset];
+                case EFB_Plus:
+                    sd[threadIdx.x] += sd[threadIdx.x + offset];
+                    break;
+                case EFB_Multiply:
+                    sd[threadIdx.x] *= sd[threadIdx.x + offset];
+                    break;
+                case EFB_Max:
+                    if(sd[threadIdx.x] < sd[threadIdx.x + offset])
+                    {
+                        sd[threadIdx.x] = sd[threadIdx.x + offset];
+                    }
+                    break;
+                case EFB_Min:
+                    if(sd[threadIdx.x] > sd[threadIdx.x + offset])
+                    {
+                        sd[threadIdx.x] = sd[threadIdx.x + offset];
+                    }
+                    break;
+                }
+
+            }
+        }
+
+        //thread no. 0 stores result
+        if(threadIdx.x == 0)
+        {
+            outBlockResults[blockIdx.x] = sd[0];
+        }
+    }
+    class OperationBinaryAssociative : public OperationGpu
+    {
+        public:
+            OperationBinaryAssociative(const MatrixGpu& inA, EFunctionBinaryAssociative inType)
+                : m_A(inA), m_Type(inType)
+            {
+            }
+
+            virtual void GetResultSize(int &outX, int &outY) const
+            {
+                outX = 1;
+                outY = 1;
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            {
+                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+
+                outMatrix.Reset(1, 1);
+
+
+                static int ThreadsPerBlock = 512;
+
+                int num = m_A.getX()*m_A.getY();
+
+                int blocks = (num - 1) / ThreadsPerBlock + 1;
+
+                float *tmp = allocate(blocks);
+
+                parallelAssociativeOperator<<<blocks, ThreadsPerBlock, ThreadsPerBlock*sizeof(float)>>>(m_A.getDataConst(), num, m_Type, tmp);
+                parallelAssociativeOperator<<<1, blocks, blocks*sizeof(float)>>>(tmp, blocks, m_Type, outMatrix.getData());
+            }
+
+        protected:
+            const MatrixGpu& m_A;
+            const EFunctionBinaryAssociative m_Type;
+    };
+
 
     class OperationMatrixAdd : public OperationGpu
     {
@@ -427,6 +553,11 @@ namespace YAMATH
         *outData = inData[inIndex];
     }
 
+
+    void testSum(const MatrixGpu& inA, MatrixGpu &outMatrix)
+    {
+    }
+
     class OperationMatrixAggregate : public OperationGpu
     {
         public:
@@ -483,6 +614,10 @@ namespace YAMATH
                     //cudaThreadSynchronize();
 
                     //cout << "MAX_INDEX = " << resIndex << endl;
+                }
+                else if(m_Type == EA_Sum)
+                {
+                    testSum(m_A, outMatrix);                    
                 }
 
             }
@@ -704,6 +839,25 @@ namespace YAMATH
     OperationMatrixTransform MatrixGpu::operator^(const char *inType) const
         {
             return OperationMatrixTransform(*this, inType);
+        }
+    OperationBinaryAssociative MatrixGpu::Sum(void) const
+        {
+            return OperationBinaryAssociative(*this, EFB_Plus);
+        }
+
+    OperationBinaryAssociative MatrixGpu::Multiply(void) const
+        {
+            return OperationBinaryAssociative(*this, EFB_Multiply);
+        }
+
+    OperationBinaryAssociative MatrixGpu::Max(void) const
+        {
+            return OperationBinaryAssociative(*this, EFB_Max);
+        }
+
+    OperationBinaryAssociative MatrixGpu::Min(void) const
+        {
+            return OperationBinaryAssociative(*this, EFB_Min);
         }
 
     MatrixGpu &MatrixGpu::operator^=(float inExponent)

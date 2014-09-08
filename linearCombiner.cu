@@ -45,18 +45,24 @@ void saveMatrix(MatrixCpu &inM, char* filename)
 
 void msgG(char * inMsg, const MatrixGpu &inM)
 {
-    cout << "GPU: " << inMsg << ":" << endl;
     MatrixCpu x = inM;
     if(x.getX()*x.getY() > 400)
     {
+        cout << "GPU: " << inMsg << ":" << endl;
         cout << x.getX() << " x " << x.getY() << endl;
         cout << "[ " << (x.getData()[0]) << " ... " << (x.getData()[x.getX()*x.getY()-1]) << " ]" << endl;
+        cout << endl;
+    }
+    else if(x.getX()*x.getY() == 1)
+    {
+        cout << "GPU: " << inMsg << ":" << x.getData()[0] << flush;
     }
     else
     {
+        cout << "GPU: " << inMsg << ":" << endl;
         x.Save(cout);
+        cout << endl;
     }
-    cout << endl;
 }
 
 void msgC(char * inMsg, const MatrixCpu &inM)
@@ -227,6 +233,8 @@ int main(int argc, char** argv)
 
     Mat y, e, suma, dw, dty;
 
+    cout << endl;
+
     
     for(int i = 0; i < 100000; ++i)
     {
@@ -259,18 +267,17 @@ int main(int argc, char** argv)
         dty = t - y;
         ms("dty=t-y", dty);
 
-        e = dty;
-        //ms("e=dty", e);
-
-        e ^= 2.0f;//elementwise
-        //ms("e^=2", e);
-
-        e *= 0.5f;
-        //ms("e*=0.5f", e);
-
-        if(i % 10 == 0)
+        if(i % 100 == 0)
         {
+            e = dty;
+            //ms("e=dty", e);
+    
+            e ^= 2.0f;//elementwise
+            //ms("e^=2", e);
+    
+            cout << "\r" << i << ": ";
             suma = e.AbsSum();
+            suma *= 1.0f / x.getX();
             msgG("abssum", suma);
             //cout << "error:" << ee << endl;
             //if(ee < 0.001f)

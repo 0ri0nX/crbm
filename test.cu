@@ -178,13 +178,21 @@ void setScalar(MatrixCpu &inA, float inValue)
         inA.getData()[i] = inValue;
     }
 }
-void setSequence(MatrixCpu &inA)
+void setSequence(MatrixCpu &inA, float start = 0.0f, float increment = 1.0f)
 {
     for(int i = 0; i < inA.getX()*inA.getY(); ++i)
     {
-        inA.getData()[i] = float(i);
+        inA.getData()[i] = start + float(i)*increment;
     }
 }
+
+#define testParallelAssociativeoperation(matrix, function)\
+{\
+    Mat mm;\
+    mm = matrix.function();\
+    ms(#matrix "." #function "()", mm);\
+}
+
 int main(int argc, char** argv)
 {
     
@@ -237,8 +245,9 @@ int main(int argc, char** argv)
 
         setSequence(*tCpu);
 
+        setSequence(*wCpu, 1.0f, 3.1f);
         //setIdentity(*wCpu);
-        setScalar(*wCpu, 2.0);
+        //setScalar(*wCpu, -2.0);
 
         Mat x = *xCpu;
         ms("x", x);
@@ -255,6 +264,15 @@ int main(int argc, char** argv)
         //ms("res = x * w", res);
         Mat res = (x^"T") * w;
         ms("res = (x^\"T\") * w", res);
+
+        //Mat sum;
+        //sum = w.Sum();
+        //ms("sum = w.Sum()", sum);
+
+        testParallelAssociativeoperation(w, Sum)
+        testParallelAssociativeoperation(w, Min)
+        testParallelAssociativeoperation(w, Max)
+        testParallelAssociativeoperation(w, Multiply)
 
         delete xCpu;
         delete tCpu;

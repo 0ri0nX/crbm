@@ -163,6 +163,29 @@ void testCpu(int x, int y)
 //const float x4[] = {1.0f, 1.0f, 1.0f};
 //const float t4[] = {0.0f, 1.0f};
 
+typedef MatrixGpu Mat;
+
+void computeError(Mat &inW, Mat &inInp, Mat &inOut)
+{
+    //cout << "inW:" << inW.getX() << " x " << inW.getY() << endl;
+    //cout << "inInp:" << inInp.getX() << " x " << inInp.getY() << endl;
+    Mat r, r2, r3;
+    //msgG("www=", inW);
+    //msgG("iiinp=", inInp);
+    //msgG("ooout=", inOut);
+    r = inInp * inW;
+    //msgG("r=", r);
+    r2 = r - inOut;
+    //msgG("r2=", r2);
+    r2 ^= 2.0f;
+    //msgG("r2=", r2);
+    r3 = r2.AbsSum();
+    //msgG("r3=", r3);
+    r3 *= 1.0f / inInp.getX();
+    //msgG("r3=", r3);
+
+    msgG("abssum2", r3);
+}
 
 int main(int argc, char** argv)
 {
@@ -184,7 +207,6 @@ int main(int argc, char** argv)
 
     float lSpeed = atof(argv[4]);
 
-    typedef MatrixGpu Mat;
 
 
     MatrixCpu *xCpu = new MatrixCpu();
@@ -267,7 +289,7 @@ int main(int argc, char** argv)
         dty = t - y;
         ms("dty=t-y", dty);
 
-        if(i % 100 == 0)
+        if(i % 1 == 0)
         {
             e = dty;
             //ms("e=dty", e);
@@ -279,11 +301,16 @@ int main(int argc, char** argv)
             suma = e.AbsSum();
             suma *= 1.0f / x.getX();
             msgG("abssum", suma);
+            //msgG("x", x);
+            //msgG("w", w);
+            computeError(w, x, t);
+            cout << endl;
             //cout << "error:" << ee << endl;
             //if(ee < 0.001f)
             //{
             //    break;
             //}
+
         }
 
         dw = (x^"T") * dty;

@@ -8,12 +8,20 @@
 
 namespace YAMATH
 {
-    int xxx = 50;
+
+//#define DEBUG_MATRIX_CLASS
+//#define DEBUG_ALLOCATION
+
+#ifdef DEBUG_ALLOCATION
+    int xxx = 0;
+#endif
 
     float * allocate(int inNum)
     {
-        assert(--xxx);
-        cout << "af";
+#ifdef DEBUG_ALLOCATION
+        ++xxx;
+        cout << "a(" << xxx << ")";
+#endif
         float *ptr = NULL;
         cudaMalloc((void**) &ptr, inNum*sizeof(float));
         assert(ptr != NULL);
@@ -22,7 +30,9 @@ namespace YAMATH
 
     int * allocateInt(int inNum)
     {
+#ifdef DEBUG_ALLOCATION
         cout << "ai";
+#endif
         int *ptr = NULL;
         cudaMalloc((void**) &ptr, inNum*sizeof(int));
         assert(ptr != NULL);
@@ -31,7 +41,10 @@ namespace YAMATH
 
     void deallocate(float *inFloatArray)
     {
-        cout << "df";
+#ifdef DEBUG_ALLOCATION
+        --xxx;
+        cout << "d";
+#endif
         cudaFree(inFloatArray);
     }
 
@@ -157,6 +170,36 @@ namespace YAMATH
             float* getDataConst(void) const { return m_Data; }
             float* getData(void) { return m_Data; }
 
+            inline void set(int inX, int inY, float inValue)
+            {
+                m_Data[IDX2C(inX, inY, getX())] = inValue;
+            }
+
+            inline float get(int inX, int inY) const
+            {
+                return m_Data[IDX2C(inX, inY, getX())];
+            }
+
+            
+
+            MatrixCpu SubMatrix(int inStartRow, int inStartCol, int inEndRow, int inEndCol) //start is inclusive, end is NON inclusive
+            {
+                assert(inStartRow >= 0 && inEndRow <= getX());
+                assert(inStartCol >= 0 && inEndCol <= getY());
+
+                MatrixCpu m(inEndRow - inStartRow, inEndCol - inStartCol);
+
+                for(int i = 0; i < m.getX(); ++i)
+                {
+                    for(int j = 0; j < m.getY(); ++j)
+                    {
+                        m.set(i, j, get(inStartRow + i, inStartCol + j));
+                    }
+                }
+
+                return m;
+            }
+
             void Reset(int inX, int inY, const float * inInit = NULL)
             {
                 if(m_X != inX || m_Y != inY)
@@ -193,7 +236,9 @@ namespace YAMATH
                 : m_X(x), m_Y(y), m_Data(NULL)
             {
                 m_Data = allocate(m_X*m_Y);
+#ifdef DEBUG_MATRIX_CLASS
                 cout << "c";
+#endif
             }
 
 //column-first order - ld is leading dimension size - #rows
@@ -205,7 +250,9 @@ namespace YAMATH
 
             ~MatrixGpu(void)
             {
+#ifdef DEBUG_MATRIX_CLASS
                 cout << "d";
+#endif
                 deallocate(m_Data);
             }
 

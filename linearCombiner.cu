@@ -209,21 +209,43 @@ int main(int argc, char** argv)
 
 
 
-    MatrixCpu *xCpu = new MatrixCpu();
-    MatrixCpu *tCpu = new MatrixCpu();
+    MatrixCpu *xxCpu = new MatrixCpu();
+    MatrixCpu *ttCpu = new MatrixCpu();
 
-    loadMatrix(*xCpu, argv[1]);
+    loadMatrix(*xxCpu, argv[1]);
+    loadMatrix(*ttCpu, argv[2]);
+
+    int rows = xxCpu->getX();
+    int cols = xxCpu->getY();
+    int colsT = ttCpu->getY();
+
+    int fract = rows - rows/10;
+
+    MatrixCpu *xCpu = new MatrixCpu(xxCpu->SubMatrix(0, 0, fract, cols));
+    MatrixCpu *xCpuTe = new MatrixCpu(xxCpu->SubMatrix(fract, 0, rows, cols));
+
+    MatrixCpu *tCpu = new MatrixCpu(ttCpu->SubMatrix(0, 0, fract, colsT));
+    MatrixCpu *tCpuTe = new MatrixCpu(ttCpu->SubMatrix(fract, 0, rows, colsT));
+
+    delete xxCpu;
+    delete ttCpu;
+
     Mat x = *xCpu;
-    ms("x", x);
-    //Mat xt = x^"T";
-    //ms("x^T", xt);
-
-    loadMatrix(*tCpu, argv[2]);
     Mat t = *tCpu;
+    ms("x", x);
     ms("t", t);
+
+    Mat xTe = *xCpuTe;
+    Mat tTe = *tCpuTe;
+    ms("x", xTe);
+    ms("t", tTe);
 
     delete xCpu;
     delete tCpu;
+
+    delete xCpuTe;
+    delete tCpuTe;
+
 
     //Mat m;
     //m = x.AbsMax();
@@ -240,7 +262,7 @@ int main(int argc, char** argv)
     //t = MatrixCpu(1, 2, t1);
 
     Mat w(x.getY(), t.getY()); //init weights
-    //w.Rand();
+    w.Rand();
     w = 0.0f;
     ms("w", w);
 
@@ -258,7 +280,7 @@ int main(int argc, char** argv)
     cout << endl;
 
     
-    for(int i = 0; i < 100000; ++i)
+    for(int i = 0; i < 2100; ++i)
     {
         //switch(i%4)
         //{
@@ -291,19 +313,20 @@ int main(int argc, char** argv)
 
         if(i % 1 == 0)
         {
-            e = dty;
-            //ms("e=dty", e);
+            //e = dty;
+            ////ms("e=dty", e);
     
-            e ^= 2.0f;//elementwise
-            //ms("e^=2", e);
+            //e ^= 2.0f;//elementwise
+            ////ms("e^=2", e);
     
-            cout << "\r" << i << ": ";
-            suma = e.AbsSum();
-            suma *= 1.0f / x.getX();
-            msgG("abssum", suma);
+            cout /*<< "\r"*/ << i << ": ";
+            //suma = e.AbsSum();
+            //suma *= 1.0f / x.getX();
+            //msgG("abssum", suma);
             //msgG("x", x);
             //msgG("w", w);
             computeError(w, x, t);
+            computeError(w, xTe, tTe);
             cout << endl;
             //cout << "error:" << ee << endl;
             //if(ee < 0.001f)

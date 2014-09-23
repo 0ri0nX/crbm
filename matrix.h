@@ -210,6 +210,16 @@ namespace YAMATH
         EFE_Pow,
         EFE_ScalarMultiply,
         EFE_Fill,
+        EFE_Less,
+        EFE_LessOrEqual,
+        EFE_Equal,
+        EFE_GreaterOrEqual,
+        EFE_Greater,
+        EFE_NotEqual,
+        EFE_PlusScalar,
+        EFE_MinusScalar,
+        EFE_MultiplyScalar,
+        EFE_DivideScalar,
     };
 
     enum EAggregate
@@ -469,21 +479,38 @@ namespace YAMATH
             MatrixGpu &operator=(const MatrixCpu& inMatrix);
             MatrixGpu &operator=(const MatrixGpu& inMatrix);
 
-            //TODO: + - * / by elementwise class and matrix* by method!
+            //comparison with one float returns matrix where each element is equal 1.0 if comparison is true otherwise 0.0
+            OperationMatrixApplyElementwise operator<(float  inVal) const;
+            OperationMatrixApplyElementwise operator<=(float inVal) const;
+            OperationMatrixApplyElementwise operator==(float inVal) const;
+            OperationMatrixApplyElementwise operator>=(float inVal) const;
+            OperationMatrixApplyElementwise operator>(float  inVal) const;
+            OperationMatrixApplyElementwise operator!=(float inVal) const;
+
+            //elementwise binary matrix operators: + - * /
             OperationMatrixElementwiseBinary operator+(const MatrixGpu &inB) const;
             OperationMatrixElementwiseBinary operator-(const MatrixGpu &inB) const;
             OperationMatrixElementwiseBinary operator*(const MatrixGpu &inB) const;//elementwise multiplication!
             OperationMatrixElementwiseBinary operator/(const MatrixGpu &inB) const;
 
-            OperationMatrixAggregate AbsMax(void) const;
-            OperationMatrixAggregate AbsMin(void) const;
-            OperationMatrixAggregate AbsSum(void) const;
+            //aggregation functions over all elements of a matrix
             OperationBinaryAssociative Sum(void) const;
             OperationBinaryAssociative Min(void) const;
             OperationBinaryAssociative Max(void) const;
-            OperationBinaryAssociative Multiply(void) const;
+            OperationBinaryAssociative Product(void) const;
+            //aggregation over absolute values of elements
+            OperationMatrixAggregate AbsMax(void) const;
+            OperationMatrixAggregate AbsMin(void) const;
+            OperationMatrixAggregate AbsSum(void) const;
 
             //OperationMatrixTransform operator^(const char *inType) const;
+
+            //operation with scalar
+            OperationMatrixApplyElementwise operator^(float inVal) const;
+            OperationMatrixApplyElementwise operator+(float inVal) const;
+            OperationMatrixApplyElementwise operator-(float inVal) const;
+            OperationMatrixApplyElementwise operator*(float inVal) const;
+            OperationMatrixApplyElementwise operator/(float inVal) const;
 
             MatrixGpu &operator^=(float inExponent);
             MatrixGpu &operator*=(float inVal);
@@ -933,7 +960,7 @@ namespace YAMATH
             const EAggregate m_Type;
     };
 
-    __global__ void applyFunction(float *outTarget, float *inSource, int N, EFunctionElementwise inType, float inParam1)
+    __global__ void applyFunction(float *outTarget, const float *inSource, int N, EFunctionElementwise inType, float inParam1)
         {
             /* which element does this compute? */
             int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -958,21 +985,42 @@ namespace YAMATH
                     case EFE_Fill:
                         outTarget[tid] = inParam1;
                         break;
+                    case EFE_Less:
+                        outTarget[tid] = inSource[tid] < inParam1;
+                        break;
+                    case EFE_LessOrEqual:
+                        outTarget[tid] = inSource[tid] <= inParam1;
+                        break;
+                    case EFE_Equal:
+                        outTarget[tid] = inSource[tid] == inParam1;
+                        break;
+                    case EFE_GreaterOrEqual:
+                        outTarget[tid] = inSource[tid] >= inParam1;
+                        break;
+                    case EFE_Greater:
+                        outTarget[tid] = inSource[tid] > inParam1;
+                        break;
+                    case EFE_NotEqual:
+                        outTarget[tid] = inSource[tid] != inParam1;
+                        break;
                 }
             }
         }
     
-    void funcElementwise(MatrixGpu &inOutMatrix, EFunctionElementwise inType, float inParam1 = 0.0f)
+    void funcElementwise(MatrixGpu &outMatrix, const MatrixGpu &inMatrix, EFunctionElementwise inType, float inParam1 = 0.0f)
         {
+            assert (inMatrix.getX() == outMatrix.getX());
+            assert (inMatrix.getY() == outMatrix.getY());
+
             static int ThreadsPerBlock = 256;
 
             dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
 
-            int num = inOutMatrix.getX()*inOutMatrix.getY();
+            int num = inMatrix.getX()*inMatrix.getY();
 
             dim3 threadsPerGrid((num - 1) / ThreadsPerBlock + 1, 1, 1);
 
-            applyFunction<<<threadsPerGrid, threadsPerBlock>>>(inOutMatrix.getData(), inOutMatrix.getData(), num, inType, inParam1);
+            applyFunction<<<threadsPerGrid, threadsPerBlock>>>(outMatrix.getData(), inMatrix.getDataConst(), num, inType, inParam1);
             //gpuErrCheck( cudaPeekAtLastError() );
             //gpuErrCheck( cudaDeviceSynchronize() );
         }
@@ -980,7 +1028,7 @@ namespace YAMATH
     class OperationMatrixApplyElementwise : public OperationGpu
     {
         public:
-            OperationMatrixApplyElementwise(MatrixGpu& inA, EFunctionElementwise inType, float inParam1)
+            OperationMatrixApplyElementwise(const MatrixGpu& inA, EFunctionElementwise inType, float inParam1)
                 : m_A(inA), m_Type(inType), m_Param1(inParam1)
             {
             }
@@ -994,11 +1042,11 @@ namespace YAMATH
 
             virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
             {
-                funcElementwise(m_A, m_Type, m_Param1);
+                funcElementwise(outMatrix, m_A, m_Type, m_Param1);
             }
 
         protected:
-            MatrixGpu& m_A;
+            const MatrixGpu& m_A;
             EFunctionElementwise m_Type;
             float m_Param1;
     };
@@ -1104,7 +1152,7 @@ namespace YAMATH
         }
     MatrixGpu &MatrixGpu::operator=(float inFill)
         {
-            funcElementwise(*this, EFE_Fill, inFill);
+            funcElementwise(*this, *this, EFE_Fill, inFill);
 
             return *this;
         }
@@ -1156,7 +1204,7 @@ namespace YAMATH
             return OperationBinaryAssociative(*this, EFB_Plus);
         }
 
-    OperationBinaryAssociative MatrixGpu::Multiply(void) const
+    OperationBinaryAssociative MatrixGpu::Product(void) const
         {
             return OperationBinaryAssociative(*this, EFB_Multiply);
         }
@@ -1211,6 +1259,63 @@ namespace YAMATH
         return OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide);
     }
 
+
+    OperationMatrixApplyElementwise MatrixGpu::operator<(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_Less, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator<=(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_LessOrEqual, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator==(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_Equal, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator>=(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_GreaterOrEqual, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator>(float  inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_Greater, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator!=(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_NotEqual, inVal);
+    }
+
+    OperationMatrixApplyElementwise MatrixGpu::operator^(float inVal) const
+    {
+        if(inVal == 2.0f)
+        {
+            return OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f);
+        }
+        else if(inVal == 0.5f)
+        {
+            return OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f);
+        }
+        else
+        {
+            return OperationMatrixApplyElementwise(*this, EFE_Pow, inVal);
+        }
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator+(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_PlusScalar, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator-(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_MinusScalar, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator*(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_MultiplyScalar, inVal);
+    }
+    OperationMatrixApplyElementwise MatrixGpu::operator/(float inVal) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_DivideScalar, inVal);
+    }
 }
 
 #endif //MATRIX_H

@@ -199,7 +199,7 @@ int main(int argc, char** argv)
     delete wCpu;
 
     Mat y;
-    y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+    y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
     ms("y=x*w", y);
 
     MatrixCpu res = y;

@@ -225,44 +225,49 @@ int main(int argc, char** argv)
 
     typedef MatrixGpu Mat;
 
+    int ix = atoi(argv[1]);
+    int iy = atoi(argv[2]);
+    int iz = atoi(argv[3]);
 
-    if(1)
-    {
-        int ix = atoi(argv[1]);
-        int iy = atoi(argv[2]);
-        int iz = atoi(argv[3]);
+    MatrixCpu *xCpu = new MatrixCpu();
+    MatrixCpu *tCpu = new MatrixCpu();
+    MatrixCpu *wCpu = new MatrixCpu();
 
-        MatrixCpu *xCpu = new MatrixCpu();
-        MatrixCpu *tCpu = new MatrixCpu();
-        MatrixCpu *wCpu = new MatrixCpu();
+    xCpu->Reset(ix, iy);
+    tCpu->Reset(ix, iz);
+    wCpu->Reset(iy, iz);
 
-        xCpu->Reset(iy, ix);
-        tCpu->Reset(ix, iz);
-        wCpu->Reset(iy, iz);
+    //setScalar(*xCpu, 3.0);
+    setSequence(*xCpu);
 
-        //setScalar(*xCpu, 3.0);
-        setSequence(*xCpu);
+    setSequence(*tCpu);
 
-        setSequence(*tCpu);
+    setSequence(*wCpu, 1.0f, 3.1f);
+    //setIdentity(*wCpu);
+    //setScalar(*wCpu, -2.0);
 
-        setSequence(*wCpu, 1.0f, 3.1f);
-        //setIdentity(*wCpu);
-        //setScalar(*wCpu, -2.0);
-
-        Mat x = *xCpu;
-        ms("x", x);
-        //Mat xt = x^"T";
-        //ms("x^T", xt);
+    Mat x = *xCpu;
+    ms("x", x);
+    //Mat xt = x^"T";
+    //ms("x^T", xt);
     
-        //Mat t = *tCpu;
-        //ms("t", t);
+    Mat t = *tCpu;
+    ms("t", t);
 
-        Mat w = *wCpu;
-        ms("w", w);
+    Mat w = *wCpu;
+    ms("w", w);
+
+    delete xCpu;
+    delete tCpu;
+    delete wCpu;
+
+    if(0)
+    {
 
         //Mat res = x * w;
         //ms("res = x * w", res);
-        Mat res = (x^"T") * w;
+        //Mat res = (x^"T") * w;
+        Mat res = x.trans() * w;
         ms("res = (x^\"T\") * w", res);
 
         //Mat sum;
@@ -273,10 +278,43 @@ int main(int argc, char** argv)
         testParallelAssociativeoperation(w, Min)
         testParallelAssociativeoperation(w, Max)
         testParallelAssociativeoperation(w, Multiply)
+    }
 
-        delete xCpu;
-        delete tCpu;
-        delete wCpu;
+#define timeIt(x)\
+    {\
+        //clock_t st = clock();\
+        x;\
+        //cudaDeviceSynchronize();\
+        //clock_t en = clock();\
+        //cout << "Duration (" #x "): " << (en - st) / double(CLOCKS_PER_SEC) << " sec" << endl;\
+    }
+
+
+    if(1)
+    {
+
+        {
+            clock_t st = clock();
+            for(int i = 0; i < 1000; ++i)
+            {
+                t = (x-t);
+            }
+            cudaDeviceSynchronize();
+            clock_t en = clock();
+            ms("t", t);
+            cout << "Total duration: " << (en - st) / double(CLOCKS_PER_SEC) << " sec" << endl;
+        }
+        //{
+        //    clock_t st = clock();
+        //    for(int i = 0; i < 1000; ++i)
+        //    {
+        //        t = x.TestMinus(t);
+        //    }
+        //    cudaDeviceSynchronize();
+        //    clock_t en = clock();
+        //    ms("t", t);
+        //    cout << "Total duration: " << (en - st) / double(CLOCKS_PER_SEC) << " sec" << endl;
+        //}
     }
 
     return 0;

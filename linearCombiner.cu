@@ -55,7 +55,7 @@ void msgG(char * inMsg, const MatrixGpu &inM)
     }
     else if(x.getX()*x.getY() == 1)
     {
-        cout << "GPU: " << inMsg << ":" << x.getData()[0] << flush;
+        cout << "GPU: " << inMsg << ":[" << x.getData()[0] << "]" << flush;
     }
     else
     {
@@ -119,7 +119,7 @@ void testGpu(int x, int y)
     M c = cc;
     msgG("c", c);
 
-    M d = a*c;
+    M d = Mult(a, c);
     msgG("d=a*c", d);
 
     
@@ -173,7 +173,7 @@ void computeError(Mat &inW, Mat &inInp, Mat &inOut)
     //msgG("www=", inW);
     //msgG("iiinp=", inInp);
     //msgG("ooout=", inOut);
-    r = inInp * inW;
+    r = Mult(inInp, inW);
     //msgG("r=", r);
     r2 = r - inOut;
     //msgG("r2=", r2);
@@ -305,14 +305,17 @@ int main(int argc, char** argv)
         //}
         //ms("x", x);
         //ms("t", t);
-        y = x * w; // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
         ms("y=x*w", y);
 
+        ms("t", t);
+        ms("y", y);
         dty = t - y;
         ms("dty=t-y", dty);
 
         if(i % 1 == 0)
         {
+            ms("ZZZ:dty", dty);
             //e = dty;
             ////ms("e=dty", e);
     
@@ -336,7 +339,11 @@ int main(int argc, char** argv)
 
         }
 
-        dw = (x^"T") * dty;
+        ms("XXX:dty", dty);
+
+        ms("XXX:x", x);
+
+        dw = Mult(x.T(), dty);
         //ms("dty", dty);
         ms("dw=x^t * dty", dw);
 

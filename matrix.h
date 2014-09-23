@@ -702,16 +702,16 @@ namespace YAMATH
             switch(inType)
             {
             case EFEB_Plus:
-                outResult[threadIdx.x] = inA[threadIdx.x] + inB[threadIdx.x];
+                outResult[idx] = inA[idx] + inB[idx];
                 break;
             case EFEB_Minus:
-                outResult[threadIdx.x] = inA[threadIdx.x] - inB[threadIdx.x];
+                outResult[idx] = inA[idx] - inB[idx];
                 break;
             case EFEB_Multiply:
-                outResult[threadIdx.x] = inA[threadIdx.x] * inB[threadIdx.x];
+                outResult[idx] = inA[idx] * inB[idx];
                 break;
             case EFEB_Divide:
-                outResult[threadIdx.x] = inA[threadIdx.x] / inB[threadIdx.x];
+                outResult[idx] = inA[idx] / inB[idx];
                 break;
             }
         }

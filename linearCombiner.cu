@@ -280,7 +280,7 @@ int main(int argc, char** argv)
     cout << endl;
 
     
-    for(int i = 0; i < 2100; ++i)
+    for(int i = 0; i < 10000; ++i)
     {
         //switch(i%4)
         //{
@@ -306,12 +306,12 @@ int main(int argc, char** argv)
         //ms("x", x);
         //ms("t", t);
         y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
-        ms("y=x*w", y);
+        //msgG("y=x*w", y);
 
-        ms("t", t);
-        ms("y", y);
+        //msgG("t", t);
+        //msgG("y", y);
         dty = t - y;
-        ms("dty=t-y", dty);
+        //msgG("dty=t-y", dty);
 
         if(i % 1 == 0)
         {

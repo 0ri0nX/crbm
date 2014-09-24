@@ -43,42 +43,30 @@ void saveMatrix(MatrixCpu &inM, char* filename)
     f.close();
 }
 
-void msgG(char * inMsg, const MatrixGpu &inM)
+void msgC(char * inMsg, const MatrixCpu &x)
 {
-    MatrixCpu x = inM;
-    if(x.getX()*x.getY() > 400)
+    int n = x.getX()*x.getY();
+    if(n > 400)
     {
-        cout << "GPU: " << inMsg << ":" << endl;
-        cout << x.getX() << " x " << x.getY() << endl;
-        cout << "[ " << (x.getData()[0]) << " ... " << (x.getData()[x.getX()*x.getY()-1]) << " ]" << endl;
-        cout << endl;
+        cout << inMsg << ": " << x.getX() << " x " << x.getY()
+             << "[ " << (x.getDataConst()[0]) << ", " << (x.getDataConst()[1]) << " ... " << (x.getDataConst()[n-2]) << ", " << (x.getDataConst()[n-1]) << " ]" << endl;
     }
-    else if(x.getX()*x.getY() == 1)
+    else if(n == 1)
     {
-        cout << "GPU: " << inMsg << ":[" << x.getData()[0] << "]" << flush;
+        cout  << inMsg << ":[" << x.getDataConst()[0] << "]" << flush;
     }
     else
     {
-        cout << "GPU: " << inMsg << ":" << endl;
+        cout  << inMsg << ":" << endl;
         x.Save(cout);
         cout << endl;
     }
 }
 
-void msgC(char * inMsg, const MatrixCpu &inM)
+void msgG(char * inMsg, const MatrixGpu &inM)
 {
-    cout << "CPU: " << inMsg << ":" << endl;
-    const MatrixCpu &x = inM;
-    if(x.getX()*x.getY() > 100)
-    {
-        cout << x.getX() << " x " << x.getY() << endl;
-        cout << "[ " << (x.getDataConst()[0]) << " ... " << (x.getDataConst()[x.getX()*x.getY()-1]) << " ]" << endl;
-    }
-    else
-    {
-        x.Save(cout);
-    }
-    cout << endl;
+    MatrixCpu x = inM;
+    msgC(inMsg, x);
 }
 
 void ms(char * inMsg, const MatrixGpu &inM)
@@ -207,13 +195,13 @@ int main(int argc, char** argv)
 
     float lSpeed = atof(argv[4]);
 
-
-
     MatrixCpu *xxCpu = new MatrixCpu();
     MatrixCpu *ttCpu = new MatrixCpu();
 
     loadMatrix(*xxCpu, argv[1]);
+    msgC("matrix: ", *xxCpu);
     loadMatrix(*ttCpu, argv[2]);
+    msgC("matrix: ", *ttCpu);
 
     int rows = xxCpu->getX();
     int cols = xxCpu->getY();
@@ -246,13 +234,20 @@ int main(int argc, char** argv)
     Mat w(x.getY(), t.getY()); //init weights
     //w.Rand();
     w = 0.0f;
-    ms("w", w);
 
-    Mat y, e, suma, dw, dty;
+    //learning speed matrix
+    Mat ls(x.getY(), t.getY());
+    ls = lSpeed;
+
+    Mat lastDir(x.getY(), t.getY());
+    lastDir = 0.0f;
+
+    Mat y, e, suma, dw, dty, lsModUp, lsModDown, actDir, lsModMin;
 
     cout << endl;
+
     
-    for(int i = 0; i < 10000; ++i)
+    for(int i = 0; i < 100000; ++i)
     {
         y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
         //msgG("y=x*w", y);
@@ -271,7 +266,25 @@ int main(int argc, char** argv)
         dw = Mult(x.T(), dty);
         ms("dw=x^t * dty", dw);
 
-        dw*= lSpeed;
+        actDir = dw;
+        lsModUp = Mat(lastDir*actDir) >= 0.0f;
+        lsModDown = lsModUp <= 0.0f;
+        lsModMin = ls < (lSpeed*0.0001f);
+        lsModUp *= 1.1f;
+        lsModDown *= 0.5f;
+        lsModMin *= lSpeed*0.0001f;
+
+        //msgG("dir up      ", lsModUp);
+        //msgG("dir down    ", lsModDown);
+
+        ls = ls * Mat(lsModUp + lsModDown);
+        //ls = ls * lsMod;//Mat(Mat(Mat(lsMod>=0)*1.1f) + Mat(lsMod<0)*0.5f);
+        ls = ls + lsModMin;
+        //msgG("speed matrix", ls);
+
+        lastDir = actDir;
+        
+        dw = dw * ls;
         ms("dw*= lSpeed", dw);
 
         w = w + dw;

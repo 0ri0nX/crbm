@@ -175,6 +175,35 @@ void computeError(Mat &inW, Mat &inInp, Mat &inOut)
     msgG("abssum2", r3);
 }
 
+__global__ void testKernel(float *lSpeed, const float* lastDir, const float* actDir, float minSpeed, int n)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if(i < n)
+    {
+        bool goodDir = lastDir[i]*actDir[i] >= 0;
+
+        lSpeed[i] *= goodDir ? 1.1f : 0.5f;
+
+        if(lSpeed[i] < minSpeed)
+        {
+            lSpeed[i] = minSpeed;
+        }
+    }
+}
+
+//ls = ls * Mat(Mat(Mat(Mat(lastDir*actDir)>=0)*1.1f) + Mat(Mat(lastDir*actDir)<0)*0.5f);
+void testKernelCall(Mat ls, Mat ld, Mat ad, float minSpeed)
+{
+    int n = ls.getX()*ls.getY();
+    int tpb = 512;
+    int b = (n-1) / tpb + 1;
+
+    testKernel<<<tpb, b>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, n);
+
+}
+
+
 int main(int argc, char** argv)
 {
     if(argc != 5)
@@ -232,7 +261,7 @@ int main(int argc, char** argv)
 
 
     Mat w(x.getY(), t.getY()); //init weights
-    //w.Rand();
+    //w.RandNormal(0.0, 0.0001);
     w = 0.0f;
 
     //learning speed matrix
@@ -247,7 +276,7 @@ int main(int argc, char** argv)
     cout << endl;
 
     
-    for(int i = 0; i < 100000; ++i)
+    for(int i = 0; i < 1000; ++i)
     {
         y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
         //msgG("y=x*w", y);
@@ -267,19 +296,30 @@ int main(int argc, char** argv)
         ms("dw=x^t * dty", dw);
 
         actDir = dw;
-        lsModUp = Mat(lastDir*actDir) >= 0.0f;
-        lsModDown = lsModUp <= 0.0f;
-        lsModMin = ls < (lSpeed*0.0001f);
-        lsModUp *= 1.1f;
-        lsModDown *= 0.5f;
-        lsModMin *= lSpeed*0.0001f;
 
-        //msgG("dir up      ", lsModUp);
-        //msgG("dir down    ", lsModDown);
+        //dynamic learning speed using matrix library
+        if(0)
+        {
+            lsModUp = Mat(lastDir*actDir) >= 0.0f;
+            lsModDown = lsModUp <= 0.0f;
+            lsModMin = ls < (lSpeed*0.0001f);
+            lsModUp *= 1.1f;
+            lsModDown *= 0.5f;
+            lsModMin *= lSpeed*0.0001f;
 
-        ls = ls * Mat(lsModUp + lsModDown);
-        //ls = ls * lsMod;//Mat(Mat(Mat(lsMod>=0)*1.1f) + Mat(lsMod<0)*0.5f);
-        ls = ls + lsModMin;
+            //msgG("dir up      ", lsModUp);
+            //msgG("dir down    ", lsModDown);
+
+            ls = ls * Mat(lsModUp + lsModDown);
+            //ls = ls * Mat(Mat(Mat(Mat(lastDir*actDir)>=0)*1.1f) + Mat(Mat(lastDir*actDir)<0)*0.5f);
+            ls = ls + lsModMin;
+        }
+
+        //dynamic learning speed using specialised kernel - faster by 20%
+        if(1)
+        {
+            testKernelCall(ls, lastDir, actDir, lSpeed*0.0001f);
+        }
         //msgG("speed matrix", ls);
 
         lastDir = actDir;
@@ -294,9 +334,9 @@ int main(int argc, char** argv)
     MatrixCpu res = w;
 
     msgC("res=", res);
-    saveMatrix(res, argv[3]);
+    //saveMatrix(res, argv[3]);
 
-    cout << "done" << endl;
+    //cout << "done" << endl;
     return 0;
 
 }

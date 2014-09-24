@@ -461,7 +461,7 @@ namespace YAMATH
                 }
             }
 
-            void Rand(unsigned long long inSeed = 0)
+            void RandUniform(unsigned long long inSeed = 0)//uniform randomness (0.0f .. 1.0f]
             {
                 // Create a pseudo-random number generator
                 curandGenerator_t prng;
@@ -472,6 +472,19 @@ namespace YAMATH
 
                 // Fill the array with random numbers on the device
                 curandGenerateUniform(prng, m_Data.raw(), m_X*m_Y);
+            }
+
+            void RandNormal(float inMean, float inStdDev, unsigned long long inSeed = 0)//normal randomess, mean 0.0f standard deviation 1.0f
+            {
+                // Create a pseudo-random number generator
+                curandGenerator_t prng;
+                curandCreateGenerator(&prng, CURAND_RNG_PSEUDO_DEFAULT);
+
+                // Set the seed for the random number generator using the system clock
+                curandSetPseudoRandomGeneratorSeed(prng, inSeed != 0 ? inSeed : (unsigned long long) clock());
+
+                // Fill the array with random numbers on the device
+                curandGenerateNormal(prng, m_Data.raw(), m_X*m_Y, inMean, inStdDev);
             }
 
             MatrixGpu &operator=(const OperationGpu &inOperation);

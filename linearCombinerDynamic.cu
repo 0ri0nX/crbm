@@ -313,20 +313,6 @@ int main(int argc, char** argv)
         dty = t - y;
         //msgG("dty=t-y", dty);
 
-        if(i % 100 == 0)
-        {
-            cout << "\r" << i << ": ";
-            computeError(w, x, t);
-            float terr = computeError(w, xTe, tTe);
-            cout << endl;
-
-            if(terr < minErr)
-            {
-                minErr = terr;
-                minIndex = i;
-            }
-        }
-
         dw = Mult(x.T(), dty);
         ms("dw=x^t * dty", dw);
 
@@ -364,6 +350,21 @@ int main(int argc, char** argv)
 
         w = w + dw;
         ms("w = w + dw", w);
+
+        if(i % 100 == 0 || i == iterations )
+        {
+            cout << "\r" << i << ": ";
+            computeError(w, x, t);
+            float terr = computeError(w, xTe, tTe);
+            cout << endl;
+
+            if(terr < minErr)
+            {
+                minErr = terr;
+                minIndex = i;
+            }
+        }
+
     }    
 
     MatrixCpu res = w;

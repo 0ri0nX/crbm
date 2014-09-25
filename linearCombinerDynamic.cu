@@ -153,7 +153,7 @@ void testCpu(int x, int y)
 
 typedef MatrixGpu Mat;
 
-void computeError(Mat &inW, Mat &inInp, Mat &inOut)
+float computeError(Mat &inW, Mat &inInp, Mat &inOut)
 {
     //cout << "inW:" << inW.getX() << " x " << inW.getY() << endl;
     //cout << "inInp:" << inInp.getX() << " x " << inInp.getY() << endl;
@@ -172,10 +172,14 @@ void computeError(Mat &inW, Mat &inInp, Mat &inOut)
     r3 *= 1.0f / inInp.getX();
     //msgG("r3=", r3);
 
+    MatrixCpu rr = r3;
+
     msgG("abssum2", r3);
+
+    return rr.getDataConst()[0];
 }
 
-__global__ void testKernel(float *lSpeed, const float* lastDir, const float* actDir, float minSpeed, int n)
+__global__ void testKernel1(float *lSpeed, const float* lastDir, const float* actDir, float minSpeed, int n)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -192,6 +196,27 @@ __global__ void testKernel(float *lSpeed, const float* lastDir, const float* act
     }
 }
 
+__global__ void testKernel2(float *lSpeed, const float* lastDir, const float* actDir, float minSpeed, int n)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if(i < n)
+    {
+        float goodDir = int(lastDir[i]*actDir[i] >= 0);
+
+        float speed = lSpeed[i];
+
+        speed *= goodDir*1.1f + (goodDir-1.0f)*0.5f;
+
+        if(speed < minSpeed)
+        {
+            speed = minSpeed;
+        }
+
+        lSpeed[i] = speed;
+    }
+}
+
 //ls = ls * Mat(Mat(Mat(Mat(lastDir*actDir)>=0)*1.1f) + Mat(Mat(lastDir*actDir)<0)*0.5f);
 void testKernelCall(Mat ls, Mat ld, Mat ad, float minSpeed)
 {
@@ -199,17 +224,17 @@ void testKernelCall(Mat ls, Mat ld, Mat ad, float minSpeed)
     int tpb = 512;
     int b = (n-1) / tpb + 1;
 
-    testKernel<<<tpb, b>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, n);
+    testKernel1<<<tpb, b>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, n);
 
 }
 
 
 int main(int argc, char** argv)
 {
-    if(argc != 5)
+    if(argc != 6)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " input-vector-file target-vector-file output-weights-file learning-speed" << endl;
+        cout << argv[0] << " input-vector-file target-vector-file output-weights-file learning-speed iter" << endl;
         exit(1);
     }
 
@@ -223,6 +248,7 @@ int main(int argc, char** argv)
     }
 
     float lSpeed = atof(argv[4]);
+    float iterations = atof(argv[5]);
 
     MatrixCpu *xxCpu = new MatrixCpu();
     MatrixCpu *ttCpu = new MatrixCpu();
@@ -275,8 +301,11 @@ int main(int argc, char** argv)
 
     cout << endl;
 
+    float minErr = FLT_MAX;
+    int minIndex = 0;
+
     
-    for(int i = 0; i < 1000; ++i)
+    for(int i = 0; i < iterations; ++i)
     {
         y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
         //msgG("y=x*w", y);
@@ -284,12 +313,18 @@ int main(int argc, char** argv)
         dty = t - y;
         //msgG("dty=t-y", dty);
 
-        if(i % 1 == 0)
+        if(i % 100 == 0)
         {
-            cout /*<< "\r"*/ << i << ": ";
+            cout << "\r" << i << ": ";
             computeError(w, x, t);
-            computeError(w, xTe, tTe);
+            float terr = computeError(w, xTe, tTe);
             cout << endl;
+
+            if(terr < minErr)
+            {
+                minErr = terr;
+                minIndex = i;
+            }
         }
 
         dw = Mult(x.T(), dty);
@@ -336,7 +371,7 @@ int main(int argc, char** argv)
     msgC("res=", res);
     //saveMatrix(res, argv[3]);
 
-    //cout << "done" << endl;
+    cout << "done" << endl << "Min. test error = " << minErr << ", iteration = " << minIndex << endl;
     return 0;
 
 }

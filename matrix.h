@@ -718,10 +718,11 @@ namespace YAMATH
                 int blocks = (num - 1) / ThreadsPerBlock + 1;
 
                 //TODO: data should be held by object!!
-                float *tmp = allocateGpu<float>(blocks);
+                //float *tmp = allocateGpu<float>(blocks);
+                GpuData<float> tmp(blocks);
 
-                parallelAssociativeOperator<<<blocks, ThreadsPerBlock, ThreadsPerBlock*sizeof(float)>>>(m_A.getDataConst(), num, m_Type, tmp);
-                parallelAssociativeOperator<<<1, blocks, blocks*sizeof(float)>>>(tmp, blocks, m_Type, outMatrix.getData());
+                parallelAssociativeOperator<<<blocks, ThreadsPerBlock, ThreadsPerBlock*sizeof(float)>>>(m_A.getDataConst(), num, m_Type, tmp.raw());
+                parallelAssociativeOperator<<<1, blocks, blocks*sizeof(float)>>>(tmp.raw(), blocks, m_Type, outMatrix.getData());
             }
 
         protected:

@@ -218,14 +218,13 @@ __global__ void testKernel2(float *lSpeed, const float* lastDir, const float* ac
 }
 
 //ls = ls * Mat(Mat(Mat(Mat(lastDir*actDir)>=0)*1.1f) + Mat(Mat(lastDir*actDir)<0)*0.5f);
-void testKernelCall(Mat ls, Mat ld, Mat ad, float minSpeed)
+void testKernelCall(Mat &ls, const Mat &ld, const Mat &ad, float minSpeed)
 {
     int n = ls.getX()*ls.getY();
     int tpb = 512;
     int b = (n-1) / tpb + 1;
 
-    testKernel1<<<tpb, b>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, n);
-
+    testKernel2<<<b, tpb>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, n);
 }
 
 
@@ -314,6 +313,7 @@ int main(int argc, char** argv)
         //msgG("dty=t-y", dty);
 
         dw = Mult(x.T(), dty);
+        dw *= 1.0 / x.getX();
         ms("dw=x^t * dty", dw);
 
         actDir = dw;
@@ -354,8 +354,12 @@ int main(int argc, char** argv)
         if(i % 100 == 0 || i == iterations )
         {
             cout << "\r" << i << ": ";
-            computeError(w, x, t);
+            //computeError(w, x, t);
             float terr = computeError(w, xTe, tTe);
+            Mat mx = ls.Min();
+            msgG(", min learning coef", mx);
+            mx = ls.Max();
+            msgG(", max learning coef", mx);
             cout << endl;
 
             if(terr < minErr)

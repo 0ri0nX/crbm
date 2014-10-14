@@ -1,5 +1,5 @@
 #all: test linearCombiner compute
-all: linearCombiner linearCombinerDynamic
+all: linearCombiner linearCombinerDynamic nonLinCombinerDynamic
 
 
 test: test.cu matrix.h
@@ -16,6 +16,12 @@ linearCombinerDynamic: linearCombinerDynamic.o matrix.h linearCombinerDynamic.cu
 
 linearCombinerDynamic.o: linearCombinerDynamic.cu matrix.h
 	nvcc -c linearCombinerDynamic.cu -D DEBUG -D CUDA
+
+nonLinCombinerDynamic: nonLinCombinerDynamic.o matrix.h nonLinCombinerDynamic.cu
+	nvcc -o nonLinCombinerDynamic -D DEBUG -D CUDA -lcuda -lcublas -lcurand -lcudart nonLinCombinerDynamic.o
+
+nonLinCombinerDynamic.o: nonLinCombinerDynamic.cu matrix.h
+	nvcc -c nonLinCombinerDynamic.cu -D DEBUG -D CUDA
 
 compute: compute.cu matrix.h
 	nvcc -o compute -D CUDA compute.cu -lcublas -lcurand

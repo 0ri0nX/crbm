@@ -26,24 +26,85 @@ using namespace std;
 
 using namespace YAMATH;
 
+
 class Error{
     public:
-        Error();
+        Error(int tolerance);
         ~Error();
-        bool next(float value);
-
+        void next(float value);
+        void loadErr(float value);
+        void loadW(MatrixGpu &w);
+        bool finished(void);
+        bool loadNewW(void);
+        bool loadOldW(void);
         float oldValue;
-        float newValue;
+
+        MatrixGpu w;
+
+    protected:
+        bool runOnTolerance;
+        int tolerance;
+        int actualTolerance;
+        bool oW;
+        bool nW;
+        bool fin;
+
 };
 
-Error::Error(): oldValue(FLT_MAX), newValue(FLT_MAX){}
+
+Error::Error(int tolerance): 
+        tolerance(tolerance), 
+        actualTolerance(tolerance),
+        fin(false),
+        oW(false),
+        nW(false),
+        runOnTolerance(false),
+        oldValue(FLT_MAX)
+        {}
+
 Error::~Error(){}
-bool Error::next(float value){
-    oldValue = newValue;
-    newValue = value;
-    return oldValue>=newValue?true:false;
+
+bool Error::loadNewW(){
+    return nW;
 }
 
+bool Error::finished(){
+    return fin;
+}
+
+bool Error::loadOldW(){
+    return oW;
+}
+
+void Error::loadW(MatrixGpu &w){
+
+    this->w = w;
+    oW = false;
+    nW = false; 
+}
+
+
+void Error::next(float value){
+    if(value>oldValue){
+        if(runOnTolerance){
+            if(--actualTolerance < 0)
+                fin = true;
+        }
+        else{
+           runOnTolerance = true; 
+           oW = true;
+        } 
+        
+    }
+    else{
+        if(runOnTolerance){
+            actualTolerance = tolerance;
+            nW = true;
+        }
+        oldValue = value;
+    }
+
+}
 
 void loadMatrix(MatrixCpu &inM, char* filename, bool inTransposed = false)
 {
@@ -247,7 +308,7 @@ void testKernelCall(Mat ls, Mat ld, Mat ad, float minSpeed)
 }
 
 void learn(char* argv[]){
-    Error err;
+    Error err(2000);
     cublasStatus_t stat;
     cublasHandle_t handle;
 
@@ -298,6 +359,7 @@ void learn(char* argv[]){
 
 
     Mat w(x.getY(), t.getY()); //init weights
+    Mat wSave(x.getY(), t.getY());
     //w.RandNormal(0.0, 0.0001);
     w = 0.0f;
 
@@ -337,12 +399,18 @@ void learn(char* argv[]){
             cout<<"Error ("<<i<<") "<<computeError(w, x, t)<<" "<<computeError(w, xTe, tTe);
             cout << endl;
         }
-        if(!err.next(computeError(w, xTe, tTe))){
-            w = w - dw;
-            break;
+        err.next(computeError(w, xTe, tTe));     
+        if(err.loadOldW()){
+            wSave = w - dw;            
+            err.loadW(wSave);
         }
+        if(err.loadNewW()){
+            err.loadW(w);
+        }
+        if(err.finished()) break;
     }    
-    MatrixCpu res = w;
+    MatrixCpu res = err.w;
+    cout<<err.oldValue<<endl;
     saveMatrix(res, argv[4]);
 }
 

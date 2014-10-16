@@ -62,23 +62,6 @@ __global__ void WeightKernel(MatrixPointer W, MatrixPointer Eps, MatrixPointer R
 /******************************************************************************
  ******************************************************************************/
 
-class Error{
-    public:
-        Error();
-        ~Error();
-        bool next(float value);
-
-        float oldValue;
-        float newValue;
-};
-
-Error::Error(): oldValue(FLT_MAX), newValue(FLT_MAX){}
-Error::~Error(){}
-bool Error::next(float value){
-    oldValue = newValue;
-    newValue = value;
-    return oldValue>=newValue?true:false;
-}
 
 template<typename Matrix> class OperationAsyncGpu{
     public:
@@ -203,6 +186,93 @@ class MatrixAsync{
         int rowSize;
         int colSize;
 };
+
+
+template<int N>
+class Error{
+    public:
+        Error(int tolerance);
+        ~Error();
+        void next(float value);
+        void loadErr(float value);
+        void loadW(MatrixAsync<MatrixGpu> (&w)[N]);
+        bool finished(void);
+        bool loadNewW(void);
+        bool loadOldW(void);
+        float oldValue;
+
+        MatrixAsync<MatrixGpu> w[N];
+
+    protected:
+        bool runOnTolerance;
+        int tolerance;
+        int actualTolerance;
+        bool oW;
+        bool nW;
+        bool fin;
+
+};
+
+template<int N>
+Error<N>::Error(int tolerance): 
+        tolerance(tolerance), 
+        actualTolerance(tolerance),
+        fin(false),
+        oW(false),
+        nW(false),
+        runOnTolerance(false),
+        oldValue(FLT_MAX)
+        {}
+
+template<int N>
+Error<N>::~Error(){}
+
+template<int N>
+bool Error<N>::loadNewW(){
+    return nW;
+}
+
+template<int N>
+bool Error<N>::finished(){
+    return fin;
+}
+
+template<int N>
+bool Error<N>::loadOldW(){
+    return oW;
+}
+
+template<int N>
+void Error<N>::loadW(MatrixAsync<MatrixGpu> (&w)[N]){
+    for(int i=0; i<N; i++)
+        this->w[i] = w[i];
+    oW = false;
+    nW = false; 
+}
+
+template<int N>
+void Error<N>::next(float value){
+    if(value>oldValue){
+        if(runOnTolerance){
+            if(--actualTolerance < 0)
+                fin = true;
+        }
+        else{
+           runOnTolerance = true; 
+           oW = true;
+        } 
+        
+    }
+    else{
+        if(runOnTolerance){
+            actualTolerance = tolerance;
+            nW = true;
+        }
+        oldValue = value;
+    }
+
+}
+
 
 /* MatrixAsync methods
  ******************************************************************************
@@ -975,10 +1045,12 @@ void intHandlerFce(int signal){
         interrupt = 1;
 }
 
+
+
 void learn(char* argv[]){
 
     const int brainSize = 3;
-    Error err;
+    Error<3> err(2000);
     string w0Out = argv[4];
     w0Out += "0";
     string w1Out = argv[4];
@@ -1012,6 +1084,7 @@ void learn(char* argv[]){
 
     /* Weights initialization */
     MatrixAsync<MatrixGpu> weights[3];
+    MatrixAsync<MatrixGpu> weightsSave[3];
     //weights[0].Reset(4096,1000);
     //weights[1].Reset(1000,500);
     //weights[2].Reset(500,300);
@@ -1047,7 +1120,7 @@ void learn(char* argv[]){
     
     cout<<"Data loaded successfully."<<endl;
 
-    for(int iter=0; iter<20000; iter++){
+    for(int iter=0; iter<200000; iter++){
         /*                           ERRA CHECK                            *
         /**********************************************************************/ 
         for(int layerId = 0; layerId < brainSize; layerId++){
@@ -1056,13 +1129,18 @@ void learn(char* argv[]){
             if((layerId+1)<brainSize)
                 innerLayerTest[layerId+1].ActivateInSitu();
             cudaDeviceSynchronize();
-        }     
-        if(!err.next(computeError(innerLayerTest[brainSize].getMatrix(), desireTest.getMatrix()))){
-            for(int layerId = 0; layerId < brainSize; layerId++){
-                weights[layerId] = weights[layerId] + weightsDelta[layerId]; 
-            }
-            break;
         }
+        err.next(computeError(innerLayerTest[brainSize].getMatrix(), desireTest.getMatrix()));     
+        if(err.loadOldW()){
+            for(int layerId = 0; layerId < brainSize; layerId++){
+                weightsSave[layerId] = weights[layerId] + weightsDelta[layerId]; 
+            }
+            err.loadW(weightsSave);
+        }
+        if(err.loadNewW()){
+            err.loadW(weights);
+        }
+        if(err.finished()) break;
         /*                            FORWARD PASS                            *
         /**********************************************************************/
         for(int layerId = 0; layerId < brainSize; layerId++){
@@ -1131,9 +1209,10 @@ void learn(char* argv[]){
         cudaDeviceSynchronize(); 
         if(interrupt==1) break; 
     }
-    saveMatrix(weights[0], w0Out.c_str());
-    saveMatrix(weights[1], w1Out.c_str());
-    saveMatrix(weights[2], w2Out.c_str());    
+    saveMatrix(err.w[0], w0Out.c_str());
+    saveMatrix(err.w[1], w1Out.c_str());
+    saveMatrix(err.w[2], w2Out.c_str());
+    cout<<err.oldValue<<endl;    
 }
 
 

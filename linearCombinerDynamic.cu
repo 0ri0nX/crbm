@@ -43,13 +43,18 @@ void saveMatrix(MatrixCpu &inM, char* filename)
     f.close();
 }
 
+void msgS(char * inMsg, const MatrixGpu &x)
+{
+    cout << " " << inMsg << ": " << x.getX() << " x " << x.getY();
+}
+
 void msgC(char * inMsg, const MatrixCpu &x)
 {
     int n = x.getX()*x.getY();
     if(n > 400)
     {
         cout << inMsg << ": " << x.getX() << " x " << x.getY()
-             << "[ " << (x.getDataConst()[0]) << ", " << (x.getDataConst()[1]) << " ... " << (x.getDataConst()[n-2]) << ", " << (x.getDataConst()[n-1]) << " ]" << endl;
+             << "[ " << (x.getDataConst()[0]) << ", " << (x.getDataConst()[1]) << " ... " << (x.getDataConst()[n-2]) << ", " << (x.getDataConst()[n-1]) << " ]" << flush;
     }
     else if(n == 1)
     {
@@ -155,26 +160,16 @@ typedef MatrixGpu Mat;
 
 float computeError(Mat &inW, Mat &inInp, Mat &inOut)
 {
-    //cout << "inW:" << inW.getX() << " x " << inW.getY() << endl;
-    //cout << "inInp:" << inInp.getX() << " x " << inInp.getY() << endl;
     Mat r, r2, r3;
-    //msgG("www=", inW);
-    //msgG("iiinp=", inInp);
-    //msgG("ooout=", inOut);
     r = Mult(inInp, inW);
-    //msgG("r=", r);
     r2 = r - inOut;
-    //msgG("r2=", r2);
     r2 ^= 2.0f;
-    //msgG("r2=", r2);
-    r3 = r2.AbsSum();
-    //msgG("r3=", r3);
+    r3 = r2.Sum();
     r3 *= 1.0f / inInp.getX();
-    //msgG("r3=", r3);
 
     MatrixCpu rr = r3;
 
-    msgG("abssum2", r3);
+    //msgG("abssum2", r3);
 
     return rr.getDataConst()[0];
 }
@@ -196,7 +191,7 @@ __global__ void testKernel1(float *lSpeed, const float* lastDir, const float* ac
     }
 }
 
-__global__ void testKernel2(float *lSpeed, const float* lastDir, const float* actDir, float minSpeed, int n)
+__global__ void testKernel2(float *lSpeed, const float* lastDir, const float* actDir, float minSpeed, float maxSpeed, int n)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -213,27 +208,35 @@ __global__ void testKernel2(float *lSpeed, const float* lastDir, const float* ac
             speed = minSpeed;
         }
 
+        if(speed > maxSpeed)
+        {
+            speed = maxSpeed;
+        }
+
         lSpeed[i] = speed;
     }
 }
 
 //ls = ls * Mat(Mat(Mat(Mat(lastDir*actDir)>=0)*1.1f) + Mat(Mat(lastDir*actDir)<0)*0.5f);
-void testKernelCall(Mat &ls, const Mat &ld, const Mat &ad, float minSpeed)
+void testKernelCall(Mat &ls, const Mat &ld, const Mat &ad, float speed)
 {
     int n = ls.getX()*ls.getY();
     int tpb = 512;
     int b = (n-1) / tpb + 1;
 
-    testKernel2<<<b, tpb>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, n);
+    float minSpeed = speed*0.01;
+    float maxSpeed = speed*100;
+
+    testKernel2<<<b, tpb>>>(ls.getData(), ld.getDataConst(), ad.getDataConst(), minSpeed, maxSpeed, n);
 }
 
 
 int main(int argc, char** argv)
 {
-    if(argc != 6)
+    if(argc != 7)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " input-vector-file target-vector-file output-weights-file learning-speed iter" << endl;
+        cout << argv[0] << " input-vector-file target-vector-file output-weights-file learning-speed iteri GpuId" << endl;
         exit(1);
     }
 
@@ -246,6 +249,8 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    cudaSetDevice(atoi(argv[6]));
+
     float lSpeed = atof(argv[4]);
     float iterations = atof(argv[5]);
 
@@ -253,9 +258,9 @@ int main(int argc, char** argv)
     MatrixCpu *ttCpu = new MatrixCpu();
 
     loadMatrix(*xxCpu, argv[1]);
-    msgC("matrix: ", *xxCpu);
+    msgC("matrix: ", *xxCpu); cout << endl;
     loadMatrix(*ttCpu, argv[2]);
-    msgC("matrix: ", *ttCpu);
+    msgC("matrix: ", *ttCpu); cout << endl;
 
     int rows = xxCpu->getX();
     int cols = xxCpu->getY();
@@ -296,13 +301,14 @@ int main(int argc, char** argv)
     Mat lastDir(x.getY(), t.getY());
     lastDir = 0.0f;
 
-    Mat y, e, suma, dw, dty, lsModUp, lsModDown, actDir, lsModMin;
-
+    Mat y, e, suma, dw, dty, actDir;
+    //Mat lsModUp, lsModDown, lsModMin
     cout << endl;
 
     float minErr = FLT_MAX;
     int minIndex = 0;
 
+    bool ONE_ROW = true;
     
     for(int i = 0; i < iterations; ++i)
     {
@@ -321,10 +327,10 @@ int main(int argc, char** argv)
         //dynamic learning speed using matrix library
         if(0)
         {
-            lsModUp = Mat(lastDir*actDir) >= 0.0f;
-            lsModDown = lsModUp <= 0.0f;
-            lsModMin = ls < (lSpeed*0.0001f);
-            lsModUp *= 1.1f;
+            Mat lsModUp = Mat(lastDir*actDir) >= 0.0f;
+            Mat lsModDown = lsModUp <= 0.0f;
+            Mat lsModMin = ls < (lSpeed*0.0001f);
+            lsModUp *= 1.01f;
             lsModDown *= 0.5f;
             lsModMin *= lSpeed*0.0001f;
 
@@ -339,7 +345,7 @@ int main(int argc, char** argv)
         //dynamic learning speed using specialised kernel - faster by 20%
         if(1)
         {
-            testKernelCall(ls, lastDir, actDir, lSpeed*0.0001f);
+            testKernelCall(ls, lastDir, actDir, lSpeed);
         }
         //msgG("speed matrix", ls);
 
@@ -351,16 +357,25 @@ int main(int argc, char** argv)
         w = w + dw;
         ms("w = w + dw", w);
 
-        if(i % 100 == 0 || i == iterations )
+        if(i % 100 == 0 || i+1 == iterations )
         {
-            cout << "\r" << i << ": ";
+            cout << i << ": ";
             //computeError(w, x, t);
             float terr = computeError(w, xTe, tTe);
+            cout << terr;
             Mat mx = ls.Min();
             msgG(", min learning coef", mx);
             mx = ls.Max();
             msgG(", max learning coef", mx);
-            cout << endl;
+            msgG("", ls);
+            if(ONE_ROW)
+            {
+                cout << "              " << "\r" << flush;
+            }
+            else
+            {
+                cout << endl;
+            }
 
             if(terr < minErr)
             {
@@ -369,12 +384,14 @@ int main(int argc, char** argv)
             }
         }
 
-    }    
+       //msgS("y", y);msgS("e", e);msgS("suma", suma);msgS("dw", dw);msgS("dty", dty);msgS("lsModUp", lsModUp);msgS("lsModDown", lsModDown);msgS("actDir", actDir);msgS("lsModMin", lsModMin);
+    }
+    cout << endl; 
 
     MatrixCpu res = w;
 
-    msgC("res=", res);
-    //saveMatrix(res, argv[3]);
+    msgC("res", res);
+    saveMatrix(res, argv[3]);
 
     cout << "done" << endl << "Min. test error = " << minErr << ", iteration = " << minIndex << endl;
     return 0;

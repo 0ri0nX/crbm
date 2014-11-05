@@ -11,10 +11,31 @@ namespace YAMATH
 
 //#define DEBUG_MATRIX_CLASS
 //#define DEBUG_ALLOCATION
+//#define DEBUG_CLASS
 
 //#define debugMatrix(m) { std::cout << "matrix at " << __LINE__ << ": " << (m).getX() << " x " << (m).getY() << ((m).isTrans() ? "T" : "") <<  std::endl;}
 #define debugMatrix(m) 
 
+#ifdef DEBUG_CLASS
+    #define DEB_CONSTRUCTOR(a) { a##Number += 1; std::cout << "c" << a##Id << "(" << a##Number << ")"; }
+    #define DEB_DESTRUCTOR(a) { a##Number -= 1; std::cout << "d" << a##Id << "(" << a##Number << ")"; }
+    #define DEB_INIT(a, id) int a##Number = 0; char *a##Id = id;
+#else
+    #define DEB_CONSTRUCTOR(a)
+    #define DEB_DESTRUCTOR(a) 
+    #define DEB_INIT(a, id)
+#endif
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      assert(!abort);
+      if (abort) exit(code);
+   }
+}
 
 #ifdef DEBUG_ALLOCATION
     int xxx = 0;
@@ -25,10 +46,10 @@ namespace YAMATH
     {
 #ifdef DEBUG_ALLOCATION
         ++xxx;
-        cout << "a(" << xxx << ")";
+        cout << "a(" << xxx << ": " << inNum << " x " << sizeof(T) << ")";
 #endif
         T *ptr = NULL;
-        cudaMalloc((void**) &ptr, inNum*sizeof(T));
+        gpuErrchk(cudaMalloc((void**) &ptr, inNum*sizeof(T)));
         assert(ptr != NULL);
         return ptr;
     }
@@ -51,14 +72,16 @@ namespace YAMATH
             Holder(int inNum) :
                 m_Counter(1), m_Data(NULL)
             {
-                cudaMalloc((void**) &m_Data, inNum*sizeof(T));
-                assert(m_Data != NULL);
+                //cudaMalloc((void**) &m_Data, inNum*sizeof(T));
+                //assert(m_Data != NULL);
+                m_Data = allocateGpu<T>(inNum);
             }
 
             ~Holder(void)
             {
                 assert(m_Counter == 0);
-                cudaFree(m_Data);
+                //cudaFree(m_Data);
+                deallocateGpu<T>(m_Data);
             }
     
             int m_Counter;
@@ -150,50 +173,18 @@ namespace YAMATH
             }
     
             Holder *m_Holder;
+
+            template <typename TT>
+            friend void swapData(GpuData<TT> &inA, GpuData<TT> &inB);
     };
-/*
-#ifdef DEBUG_ALLOCATION
-    int xxx = 0;
-#endif
 
-    float * allocate(int inNum)
-    {
-#ifdef DEBUG_ALLOCATION
-        ++xxx;
-        cout << "a(" << xxx << ")";
-#endif
-        float *ptr = NULL;
-        cudaMalloc((void**) &ptr, inNum*sizeof(float));
-        assert(ptr != NULL);
-        return ptr;
-    }
-
-    int * allocateInt(int inNum)
-    {
-#ifdef DEBUG_ALLOCATION
-        cout << "ai";
-#endif
-        int *ptr = NULL;
-        cudaMalloc((void**) &ptr, inNum*sizeof(int));
-        assert(ptr != NULL);
-        return ptr;
-    }
-
-    void deallocate(float *inFloatArray)
-    {
-#ifdef DEBUG_ALLOCATION
-        --xxx;
-        cout << "d";
-#endif
-        cudaFree(inFloatArray);
-    }
-
-    void deallocateInt(int *inIntArray)
-    {
-        cout << "di";
-        cudaFree(inIntArray);
-    }
-*/
+    template <typename T>
+        void swapData(GpuData<T> &inA, GpuData<T> &inB)
+        {
+            typename GpuData<T>::Holder *tmp = inA.m_Holder;
+            inA.m_Holder = inB.m_Holder;
+            inB.m_Holder = tmp;
+        }
 
     enum EFunctionElementwiseBinary
     {
@@ -220,6 +211,7 @@ namespace YAMATH
         EFE_MinusScalar,
         EFE_MultiplyScalar,
         EFE_DivideScalar,
+        EFE_Sigmoid,
     };
 
     enum EAggregate
@@ -247,9 +239,19 @@ namespace YAMATH
     class OperationMatrixSubstract;
     class OperationMatrixApplyElementwise;
     class OperationMatrixAggregate;
-    //class OperationMatrixTransform;
     class OperationBinaryAssociative;
     class OperationMatrixElementwiseBinary;
+    class MatrixCpu;
+
+    DEB_INIT(MatrixGpu, "a");
+    DEB_INIT(OperationGpu, "b");
+    DEB_INIT(OperationMatrixMultiply, "c");
+    DEB_INIT(OperationMatrixAdd, "d");
+    DEB_INIT(OperationMatrixSubstract, "e");
+    DEB_INIT(OperationMatrixApplyElementwise, "f");
+    DEB_INIT(OperationMatrixAggregate, "g");
+    DEB_INIT(OperationBinaryAssociative, "h");
+    DEB_INIT(OperationMatrixElementwiseBinary, "i");
 
     class MatrixCpu//column-first layout
     {
@@ -399,7 +401,8 @@ namespace YAMATH
             {
                 m_Data.Reset(1);
 #ifdef DEBUG_MATRIX_CLASS
-                cout << "c";
+                m_Allocations += 1;
+                cout << "m" << m_Allocations;
 #endif
             }
 
@@ -409,7 +412,8 @@ namespace YAMATH
             {
                 m_Data.Reset(m_X*m_Y);
 #ifdef DEBUG_MATRIX_CLASS
-                cout << "c";
+                m_Allocations += 1;
+                cout << "m" << m_Allocations;
 #endif
             }
 
@@ -423,9 +427,9 @@ namespace YAMATH
             ~MatrixGpu(void)
             {
 #ifdef DEBUG_MATRIX_CLASS
-                cout << "d";
+                m_Allocations -= 1;
+                cout << "d" << m_Allocations;
 #endif
-                //deallocate(m_Data);
             }
 
             int getX(void) const { return m_X; }
@@ -446,6 +450,8 @@ namespace YAMATH
 
                 return m;
             }
+
+            MatrixGpu Sample(int inRowsNum) const;
 
             void Reset(int inX, int inY, bool inTransposed = false)
             {
@@ -472,6 +478,9 @@ namespace YAMATH
 
                 // Fill the array with random numbers on the device
                 curandGenerateUniform(prng, m_Data.raw(), m_X*m_Y);
+
+                //destroy generator
+                curandDestroyGenerator(prng);
             }
 
             void RandNormal(float inMean, float inStdDev, unsigned long long inSeed = 0)//normal randomess, mean 0.0f standard deviation 1.0f
@@ -485,6 +494,9 @@ namespace YAMATH
 
                 // Fill the array with random numbers on the device
                 curandGenerateNormal(prng, m_Data.raw(), m_X*m_Y, inMean, inStdDev);
+
+                //destroy generator
+                curandDestroyGenerator(prng);
             }
 
             MatrixGpu &operator=(const OperationGpu &inOperation);
@@ -525,6 +537,8 @@ namespace YAMATH
             OperationMatrixApplyElementwise operator*(float inVal) const;
             OperationMatrixApplyElementwise operator/(float inVal) const;
 
+            OperationMatrixApplyElementwise Sigmoid(void) const;
+
             MatrixGpu &operator^=(float inExponent);
             MatrixGpu &operator*=(float inVal);
 
@@ -542,21 +556,46 @@ namespace YAMATH
             GpuData<float> m_Data;
             bool m_Transposed;
 
+#ifdef DEBUG_MATRIX_CLASS
+            static int m_Allocations;
+#endif
+
             friend OperationMatrixMultiply Mult(const MatrixGpu &inA, const MatrixGpu &inB);//matrix multiplication!
     };
 
+#ifdef DEBUG_MATRIX_CLASS
+int MatrixGpu::m_Allocations = 0;
+#endif
+
+    struct OptimizationInfo
+    {
+        //TODO: can this handle be used for optimization of operations?
+        //It should aggregate all operations in the one command/assigment
+        //Then rearrange/megre operations into more complex kernel if possigle
+    };
 
 
     class OperationGpu
     {
         public:
-            OperationGpu(void){}
 
-            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const = 0;
+            OperationGpu(void)
+            {
+                DEB_CONSTRUCTOR(OperationGpu);
+            }
+            virtual void GetOptimizationInfo(OptimizationInfo &inOutOptInfo)
+            {
+                //TODO: adds tree-based operaton sequence
+            }
+
+            virtual void Execute(MatrixGpu &outMatrix) const = 0;
 
             virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const = 0;
 
-            virtual ~OperationGpu(void){}
+            virtual ~OperationGpu(void)
+            {
+                DEB_DESTRUCTOR(OperationGpu);
+            }
 
         protected:
             static const float m_Zero;
@@ -590,7 +629,7 @@ namespace YAMATH
                 outTransposed = false;
             }
 
-            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            virtual void Execute(MatrixGpu &outMatrix) const
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
@@ -604,13 +643,17 @@ namespace YAMATH
 
                 outMatrix.Reset(x, y);
 
-                cublasSgemm(inHandle, !m_A.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T, !m_B.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T,
+                cublasHandle_t handle;
+                cublasStatus_t stat = cublasCreate(&handle);
+
+                assert (stat == CUBLAS_STATUS_SUCCESS);
+
+                cublasSgemm(handle, !m_A.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T, !m_B.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T,
                         x, y, kA,
                         &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), x);
 
-                //cublasSgemm(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-                //        m_A.getX(), m_B.getY(), m_A.getY(),
-                //        &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), m_A.getX());
+                cublasDestroy(handle);
+
             }
 
         protected:
@@ -704,24 +747,31 @@ namespace YAMATH
                 outTransposed = false;
             }
 
-            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            virtual void Execute(MatrixGpu &outMatrix) const
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
                 outMatrix.Reset(1, 1);
 
-
                 static int ThreadsPerBlock = 512;
-
                 int num = m_A.getX()*m_A.getY();
 
                 int blocks = (num - 1) / ThreadsPerBlock + 1;
-
-                //TODO: data should be held by object!!
-                //float *tmp = allocateGpu<float>(blocks);
                 GpuData<float> tmp(blocks);
-
                 parallelAssociativeOperator<<<blocks, ThreadsPerBlock, ThreadsPerBlock*sizeof(float)>>>(m_A.getDataConst(), num, m_Type, tmp.raw());
+
+                while(blocks > ThreadsPerBlock)//repetitive call
+                {
+                    int num = blocks;
+                    blocks = (num -1) / ThreadsPerBlock + 1;
+
+                    GpuData<float> tmp2(blocks);
+
+                    swapData(tmp, tmp2);
+
+                    parallelAssociativeOperator<<<blocks, ThreadsPerBlock, ThreadsPerBlock*sizeof(float)>>>(tmp2.raw(), num, m_Type, tmp.raw());
+                }
+
                 parallelAssociativeOperator<<<1, blocks, blocks*sizeof(float)>>>(tmp.raw(), blocks, m_Type, outMatrix.getData());
             }
 
@@ -775,7 +825,7 @@ namespace YAMATH
                 outTransposed = m_A.isTrans();
             }
 
-            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            virtual void Execute(MatrixGpu &outMatrix) const
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
@@ -797,38 +847,6 @@ namespace YAMATH
             const EFunctionElementwiseBinary m_Type;
     };
 
-    //class OperationMatrixAdd : public OperationGpu
-    //{
-    //    public:
-    //        OperationMatrixAdd(const MatrixGpu& inA, const MatrixGpu& inB)
-    //            : m_A(inA), m_B(inB)
-    //        {
-    //            assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
-    //        }
-
-    //        virtual void GetResultSize(int &outX, int &outY) const
-    //        {
-    //            outX = m_A.getX();
-    //            outY = m_A.getY();
-    //        }
-
-    //        virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
-    //        {
-    //            //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
-
-    //            outMatrix.Reset(m_A.getX(), m_A.getY());
-
-    //            cublasSgeam(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-    //                    m_A.getX(), m_A.getY(),
-    //                    &m_One, m_A.getDataConst(), m_A.getX(),
-    //                    &m_One, m_B.getDataConst(), m_B.getX(),
-    //                    outMatrix.getDataConst(), m_A.getX());
-    //        }
-
-    //    protected:
-    //        const MatrixGpu& m_A;
-    //        const MatrixGpu& m_B;
-    //};
 
 #define TILE_DIM 32
 #define BLOCK_ROWS 8
@@ -860,40 +878,6 @@ namespace YAMATH
         }
     }
 
-    //class OperationMatrixTransform : public OperationGpu
-    //{
-    //    public:
-    //        OperationMatrixTransform(const MatrixGpu& inA, const char *inType)
-    //            : m_A(inA), m_Type(inType)
-    //        {
-    //            //only transpose now
-    //            assert(inType[0] == 'T' && inType[1] == '\0');
-    //        }
-
-    //        virtual void GetResultSize(int &outX, int &outY) const
-    //        {
-    //            outX = m_A.getY();
-    //            outY = m_A.getX();
-    //        }
-
-    //        virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
-    //        {
-    //            //static int ThreadsPerBlock = 32;
-    //
-    //            //dim3 threadsPerBlock(ThreadsPerBlock, ThreadsPerBlock, 1);
-    //
-    //            //dim3 threadsPerGrid((outMatrix.getX() - 1) / ThreadsPerBlock + 1, (outMatrix.getY() - 1) / ThreadsPerBlock + 1, 1);
-    //
-    //            //transposeCoalesced<<<threadsPerGrid, threadsPerBlock>>>(outMatrix.getData(), m_A.getDataConst(), outMatrix.getX(), outMatrix.getY());
-    //        }
-
-    //        OperationMatrixMultiply operator*(const MatrixGpu &inB) const;
-
-    //    protected:
-    //        const MatrixGpu& m_A;
-    //        bool m_Type;
-    //};
-
     __global__ void getIndexValue(const float *inData, int inIndex, float *outData)
     {
         *outData = inData[inIndex];
@@ -919,22 +903,27 @@ namespace YAMATH
                 outTransposed = false;
             }
 
-            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            virtual void Execute(MatrixGpu &outMatrix) const
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
                 outMatrix.Reset(1, 1);
                 
+                cublasHandle_t handle;
+                cublasStatus_t stat = cublasCreate(&handle);
+
+                assert (stat == CUBLAS_STATUS_SUCCESS);
+
                 if(m_Type == EA_AbsSum)
                 {
-                    cublasSetPointerMode(inHandle, CUBLAS_POINTER_MODE_DEVICE);
-                    cublasSasum(inHandle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, outMatrix.getData());
+                    cublasSetPointerMode(handle, CUBLAS_POINTER_MODE_DEVICE);
+                    cublasSasum(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, outMatrix.getData());
                 }
                 else if(m_Type == EA_AbsMin)
                 {
                     int resIndex;
 
-                    cublasIsamin(inHandle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
+                    cublasIsamin(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
 
                     //cudaDeviceSynchronize();
                     //cudaThreadSynchronize();
@@ -950,7 +939,7 @@ namespace YAMATH
                 {
                     int resIndex;
 
-                    cublasIsamax(inHandle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
+                    cublasIsamax(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
 
                     //cudaDeviceSynchronize();
                     //cudaThreadSynchronize();
@@ -967,6 +956,7 @@ namespace YAMATH
                     testSum(m_A, outMatrix);                    
                 }
 
+                cublasDestroy(handle);
             }
 
         protected:
@@ -1017,6 +1007,9 @@ namespace YAMATH
                     case EFE_NotEqual:
                         outTarget[tid] = inSource[tid] != inParam1;
                         break;
+                    case EFE_Sigmoid:
+                        outTarget[tid] = 1.0f/(1.0f + expf(-inSource[tid]));
+                        break;
                 }
             }
         }
@@ -1026,17 +1019,20 @@ namespace YAMATH
             assert (inMatrix.getX() == outMatrix.getX());
             assert (inMatrix.getY() == outMatrix.getY());
 
-            static int ThreadsPerBlock = 256;
+            //static int BlocksPerGrid = 65535;
+            static int ThreadsPerBlock = 512;
 
             dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
 
             int num = inMatrix.getX()*inMatrix.getY();
 
-            dim3 threadsPerGrid((num - 1) / ThreadsPerBlock + 1, 1, 1);
+            dim3 blocksPerGrid((num - 1) / ThreadsPerBlock + 1, 1, 1);
 
-            applyFunction<<<threadsPerGrid, threadsPerBlock>>>(outMatrix.getData(), inMatrix.getDataConst(), num, inType, inParam1);
-            //gpuErrCheck( cudaPeekAtLastError() );
-            //gpuErrCheck( cudaDeviceSynchronize() );
+            //std::cout << "funcElementwise: " << num << ", " << blocksPerGrid.x << ", " << threadsPerBlock.x << std::endl;
+
+            applyFunction<<<blocksPerGrid, threadsPerBlock>>>(outMatrix.getData(), inMatrix.getDataConst(), num, inType, inParam1);
+            gpuErrchk( cudaPeekAtLastError() );
+            gpuErrchk( cudaDeviceSynchronize() );
         }
 
     class OperationMatrixApplyElementwise : public OperationGpu
@@ -1054,7 +1050,7 @@ namespace YAMATH
                 outTransposed = m_A.isTrans();
             }
 
-            virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
+            virtual void Execute(MatrixGpu &outMatrix) const
             {
                 funcElementwise(outMatrix, m_A, m_Type, m_Param1);
             }
@@ -1064,39 +1060,6 @@ namespace YAMATH
             EFunctionElementwise m_Type;
             float m_Param1;
     };
-
-    //class OperationMatrixSubstract : public OperationGpu
-    //{
-    //    public:
-    //        OperationMatrixSubstract(const MatrixGpu& inA, const MatrixGpu& inB)
-    //            : m_A(inA), m_B(inB)
-    //        {
-    //            assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
-    //        }
-
-    //        virtual void GetResultSize(int &outX, int &outY) const
-    //        {
-    //            outX = m_A.getX();
-    //            outY = m_A.getY();
-    //        }
-
-    //        virtual void Execute(MatrixGpu &outMatrix, cublasHandle_t inHandle) const
-    //        {
-    //            //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
-
-    //            outMatrix.Reset(m_A.getX(), m_A.getY());
-
-    //            cublasSgeam(inHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-    //                    m_A.getX(), m_A.getY(),
-    //                    &m_One, m_A.getDataConst(), m_A.getX(),
-    //                    &m_MinusOne, m_B.getDataConst(), m_B.getX(),
-    //                    outMatrix.getDataConst(), m_A.getX());
-    //        }
-
-    //    protected:
-    //        const MatrixGpu& m_A;
-    //        const MatrixGpu& m_B;
-    //};
 
     MatrixCpu::MatrixCpu(const MatrixGpu &inMatrix)
         {
@@ -1112,6 +1075,10 @@ namespace YAMATH
 
     MatrixGpu::MatrixGpu(const MatrixGpu &inMatrix, bool inShallowCopy)
         {
+#ifdef DEBUG_MATRIX_CLASS
+            m_Allocations += 1;
+            cout << "m" << m_Allocations;
+#endif
             //cout << "c";
             Init(inMatrix.getX(), inMatrix.getY(), inMatrix.isTrans());
             if(inShallowCopy)
@@ -1126,6 +1093,10 @@ namespace YAMATH
 
     MatrixGpu::MatrixGpu(const MatrixCpu &inMatrix)
         {
+#ifdef DEBUG_MATRIX_CLASS
+            m_Allocations += 1;
+            cout << "m" << m_Allocations;
+#endif
             //cout << "c";
             Init(inMatrix.getX(), inMatrix.getY(), false);
             cudaMemcpy(getData(), inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyHostToDevice);
@@ -1147,20 +1118,25 @@ namespace YAMATH
         }
     MatrixGpu& MatrixGpu::operator=(const OperationGpu &inOperation)
         {
-            cublasHandle_t handle;
             int x, y;
             bool trans;
             inOperation.GetResultSize(x, y, trans);
             Init(x, y, trans);
 
-            cublasStatus_t stat;
-        
-            stat = cublasCreate(&handle);
-            assert (stat == CUBLAS_STATUS_SUCCESS);
 
-            inOperation.Execute(*this, handle);
+            //TODO:optimization step
+            //OptimizationInfo optInfo;
+            //inOperation.GetOptimizationInfo(optInfo);
+            //OperationGpu newOperation = Optimize(optInfo);
+            //newOperation.Execute(*this);
+ 
+            gpuErrchk( cudaPeekAtLastError() );
+            gpuErrchk( cudaDeviceSynchronize() );
 
-            cublasDestroy(handle);
+            inOperation.Execute(*this);
+
+            gpuErrchk( cudaPeekAtLastError() );
+            gpuErrchk( cudaDeviceSynchronize() );
 
             return *this;
         }
@@ -1173,18 +1149,22 @@ namespace YAMATH
 
     MatrixGpu::MatrixGpu(const OperationGpu &inOperation)
         {
+#ifdef DEBUG_MATRIX_CLASS
+            m_Allocations += 1;
+            cout << "m" << m_Allocations;
+#endif
             int x, y;
             bool trans;
             inOperation.GetResultSize(x, y, trans);
             Init(x, y, trans);
 
-            cublasHandle_t handle;
-            cublasStatus_t stat;
-        
-            stat = cublasCreate(&handle);
-            assert (stat == CUBLAS_STATUS_SUCCESS);
-
-            inOperation.Execute(*this, handle);
+            //TODO:optimization step
+            //OptimizationInfo optInfo;
+            //inOperation.GetOptimizationInfo(optInfo);
+            //OperationGpu newOperation = Optimize(optInfo);
+            //newOperation.Execute(*this);
+ 
+            inOperation.Execute(*this);
         }
 
     OperationMatrixMultiply Mult(const MatrixGpu &inA, const MatrixGpu &inB)//matrix multiplication friend!
@@ -1330,6 +1310,50 @@ namespace YAMATH
     {
         return OperationMatrixApplyElementwise(*this, EFE_DivideScalar, inVal);
     }
+    OperationMatrixApplyElementwise MatrixGpu::Sigmoid(void) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_Sigmoid, 0.0f);
+    }
+
+//column-first order - ld is leading dimension size - #rows
+//#define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
+    __global__ void sample(float *outData, float *inData, float* inRnd, int x, int y, int N)
+    {
+        /* which element does this compute? */
+        int rid = blockDim.x * blockIdx.x + threadIdx.x;
+        
+        /* if valid, squre the array element */
+        if (rid < N)
+        {
+            int row = int(inRnd[rid]*x);
+
+            for(int i = 0; i < y; ++i)
+            {
+                outData[IDX2C(rid, i, N)] = inData[IDX2C(row, i, x)];
+            }
+
+        }
+    }
+
+    MatrixGpu MatrixGpu::Sample(int inRowsNum) const
+    {
+        MatrixGpu rnd(inRowsNum, 1);
+        rnd.RandUniform();
+
+        MatrixGpu res(inRowsNum, getY());
+
+        static int ThreadsPerBlock = 256;
+
+        dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
+
+        dim3 blocksPerGrid((inRowsNum - 1) / ThreadsPerBlock + 1, 1, 1);
+
+        sample<<<blocksPerGrid, threadsPerBlock>>>(res.getData(), getDataConst(), rnd.getDataConst(), getX(), getY(), inRowsNum);
+
+        return res;
+    }
+
 }
 
 #endif //MATRIX_H

@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <cassert>
+#include <string>
 
 using namespace std;
 
@@ -27,18 +28,18 @@ using namespace std;
 
 using namespace YAMATH;
 
-void loadMatrix(MatrixCpu &inM, char* filename, bool inTransposed = false)
+void loadMatrix(MatrixCpu &inM, const string& filename, bool inTransposed = false)
 {
     cout << "loading [" << filename << "] ... " << endl;
-    ifstream f(filename);
+    ifstream f(filename.c_str());
     inM.Load(f, inTransposed);
     f.close();
 }
 
-void saveMatrix(MatrixCpu &inM, char* filename)
+void saveMatrix(MatrixCpu &inM, const string &filename)
 {
     cout << "saving [" << filename << "] ... " << endl;
-    ofstream f(filename);
+    ofstream f(filename.c_str());
     inM.Save(f);
     f.close();
 }
@@ -155,11 +156,13 @@ void testCpu(int x, int y)
 
 typedef MatrixGpu Mat;
 
-float computeError(Mat &inW, Mat &inInp, Mat &inOut)
+float computeError(Mat &inInp, Mat &inOut)
 {
-    Mat r, r2, r3;
-    r = Mult(inInp, inW);
-    r2 = r - inOut;
+    Mat r2, r3;
+    r2 = inInp - inOut;
+    //msgG("in", inInp);
+    //msgG("out", inOut);
+    //msgG("r2", r2);
     r2 ^= 2.0f;
     r3 = r2.Sum();
     r3 *= 1.0f / inInp.getX();
@@ -176,7 +179,7 @@ int main(int argc, char** argv)
     if(argc != 7)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " input-vector-file target-vector-file output-weights-file learning-speed iter GpuId" << endl;
+        cout << argv[0] << " input-vector-file input-weight-file hidden-size learning-speed iter batch" << endl;
         exit(1);
     }
 
@@ -189,50 +192,53 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    cudaSetDevice(atoi(argv[6]));
+    //cudaSetDevice(atoi(argv[6]));
+    int hidden = atoi(argv[3]);
     float lSpeed = atof(argv[4]);
     float iterations = atof(argv[5]);
+    int batchSize = atoi(argv[6]);
 
-    MatrixCpu *xxCpu = new MatrixCpu();
-    MatrixCpu *ttCpu = new MatrixCpu();
+    MatrixCpu *xCpu = new MatrixCpu();
 
-    loadMatrix(*xxCpu, argv[1]);
-    loadMatrix(*ttCpu, argv[2]);
+    loadMatrix(*xCpu, argv[1]);
 
-    int rows = xxCpu->getX();
-    int cols = xxCpu->getY();
-    int colsT = ttCpu->getY();
+    int rows = xCpu->getX();
+    int cols = xCpu->getY();
 
-    int fract = rows - rows/5;
-
-    MatrixCpu *xCpu = new MatrixCpu(xxCpu->SubMatrix(0, 0, fract, cols));
-    MatrixCpu *xCpuTe = new MatrixCpu(xxCpu->SubMatrix(fract, 0, rows, cols));
-
-    MatrixCpu *tCpu = new MatrixCpu(ttCpu->SubMatrix(0, 0, fract, colsT));
-    MatrixCpu *tCpuTe = new MatrixCpu(ttCpu->SubMatrix(fract, 0, rows, colsT));
-
-    delete xxCpu;
-    delete ttCpu;
-
-    Mat x = *xCpu;
-    Mat t = *tCpu;
-
-    Mat xTe = *xCpuTe;
-    Mat tTe = *tCpuTe;
+    Mat xx = *xCpu;
+    msgG("loaded", xx);
 
     delete xCpu;
-    delete tCpu;
+    xCpu = new MatrixCpu();
 
-    delete xCpuTe;
-    delete tCpuTe;
+    if(string(argv[2]) != "-")
+    {
+        loadMatrix(*xCpu, string(argv[2]));
+        msgC("w", *xCpu);
+    }
+
+    Mat w(xx.getY(), hidden); //init weights
+    cout << xCpu->getX() << ", " << xx.getX() << ", " << xCpu->getY() << ", " << hidden << endl;
+
+    if(xCpu->getX() != xx.getY() || xCpu->getY() != hidden)
+    {
+        w.RandNormal(0.0f, 1.0f/(10*hidden));
+        cout << "weight matrix randomized!" << endl;
+    }
+    else
+    {
+        w = *xCpu;
+        cout << "weight matrix loaded!" << endl;
+    }
+    msgG("w", w);
+    delete xCpu;
 
 
-    Mat w(x.getY(), t.getY()); //init weights
-    //w.Rand();
-    w = 0.0f;
+    //w = 0.0f;
     ms("w", w);
 
-    Mat y, e, suma, dw, dty;
+    Mat x, y, x2, y2, dw1, dw2, err, lastW;
+    lastW = w;
 
     cout << endl;
     
@@ -243,24 +249,51 @@ int main(int argc, char** argv)
     
     for(int i = 0; i < iterations; ++i)
     {
+        x = xx.Sample(batchSize);
+
         y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
+        //msgG("y", y);
         //msgG("y=x*w", y);
 
-        dty = t - y;
-        //msgG("dty=t-y", dty);
+        //y = y.Sigmoid();
+        //msgG("y", y);
 
-        dw = Mult(x.T(), dty);
-        ms("dw=x^t * dty", dw);
-        dw *= lSpeed / x.getX();
+        x2 = Mult(y, w.T());
+        //msgG("x2", x2);
 
-        w = w + dw;
+        //x2 = x2.Sigmoid();
+        //msgG("x2", x2);
+
+        y2 = Mult(x2, w);
+        //msgG("y2", y2);
+
+        //y2 = y2.Sigmoid();
+        //msgG("y2", y2);
+
+        dw1 = Mult(x.T(), y);
+        //msgG("dw1", dw1);
+        dw2 = Mult(x2.T(), y2);
+        //msgG("dw2", dw2);
+
+        dw1 *= (lSpeed/x.getX());
+        dw2 *= (lSpeed/x.getX());
+
+        w = w + dw1;
+        w = w - dw2;
+
+        //lastW *= 0.00001;
+        //w = w - lastW;
+
+        lastW = w;
+        //msgG("w", w);
+
         ms("w = w + dw", w);
 
         if(i % 100 == 0 || i+1 == iterations )
         {
             cout << i << ": ";
-            //computeError(w, x, t);
-            float terr = computeError(w, xTe, tTe);
+            float terr = computeError(x, x2);
+
             cout << "              " << flush;
 
             if(ONE_ROW)
@@ -283,7 +316,17 @@ int main(int argc, char** argv)
     MatrixCpu res = w;
 
     msgC("res", res);
-    saveMatrix(res, argv[3]);
+    saveMatrix(res, string(argv[1]) + ".weights");
+
+    y = Mult(xx, w);
+    //y = y.Sigmoid();
+    MatrixCpu resy = y;
+    saveMatrix(resy, string(argv[1]) + ".transform");
+    x2 = Mult(y, w.T());
+    //x2 = x2.Sigmoid();
+    MatrixCpu resx = x2;
+    saveMatrix(resx, string(argv[1]) + ".reconstruct");
+
 
     cout << "done" << endl << "Min. test error = " << minErr << ", iteration = " << minIndex << endl;
 

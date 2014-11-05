@@ -1,9 +1,15 @@
 #all: test linearCombiner compute
-all: linearCombiner linearCombinerDynamic
+all: rbm linearCombiner linearCombinerDynamic compute
 
 
 test: test.cu matrix.h
 	nvcc -o test -D CUDA test.cu -lcublas -lcurand -D DEBUG
+
+rbm: rbm.o matrix.h rbm.cu
+	nvcc -o rbm -D DEBUG -D CUDA -lcuda -lcublas -lcurand -lcudart rbm.o
+
+rbm.o: rbm.cu matrix.h
+	nvcc -c rbm.cu -D DEBUG -D CUDA
 
 linearCombiner: linearCombiner.o matrix.h linearCombiner.cu
 	nvcc -o linearCombiner -D DEBUG -D CUDA -lcuda -lcublas -lcurand -lcudart linearCombiner.o

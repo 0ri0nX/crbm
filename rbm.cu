@@ -176,10 +176,10 @@ float computeError(Mat &inInp, Mat &inOut)
 
 int main(int argc, char** argv)
 {
-    if(argc != 7)
+    if(argc != 7 && argc != 8)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " input-vector-file input-weight-file hidden-size learning-speed iter batch" << endl;
+        cout << argv[0] << " input-vector-file input-weight-file hidden-size learning-speed iter batch [cudadevice-id]" << endl;
         exit(1);
     }
 
@@ -192,7 +192,10 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    //cudaSetDevice(atoi(argv[6]));
+    if(argc > 7)
+    {
+        cudaSetDevice(atoi(argv[7]));
+    }
     int hidden = atoi(argv[3]);
     float lSpeed = atof(argv[4]);
     float iterations = atof(argv[5]);

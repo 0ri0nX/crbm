@@ -1,9 +1,14 @@
-all: rbm rbmCompute
+all: crbm rbm rbmCompute
 #all: rbm linearCombiner linearCombinerDynamic compute
 
+%.o: %.cu matrix.h Makefile
+	nvcc -c -o $@ -O3 -D CUDA -g $<
 
 test: test.cu matrix.h
 	nvcc -o test -D CUDA test.cu -lcublas -lcurand -D DEBUG
+
+crbm: matrix.h crbm.o
+	nvcc -o crbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbm.o -g
 
 rbm: rbm.o matrix.h rbm.cu
 	nvcc -o rbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart rbm.o

@@ -1362,7 +1362,18 @@ int MatrixGpu::m_Allocations = 0;
     //a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
     inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
     {
-        return im + c*totim + a*z*totim + b*x*z*totim;
+        int idx = im + c*totim + a*z*totim + b*x*z*totim;
+        //cout << "idx: " << idx << endl;
+        return idx;
+    }
+
+    int convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, int stridey)
+    {
+
+        int nh = (x-cx)/stridex+1;
+        int nv = (y-cy)/stridey+1;
+
+        return nh*nv;
     }
 
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
@@ -1372,73 +1383,81 @@ int MatrixGpu::m_Allocations = 0;
         assert(getY() == x*y*z);
 
         //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex;
-        int nv = (y-cy)/stridey;
-
-        MatrixGpu res(nh*nv , cx*cy*z);
+        int nh = (x-cx)/stridex+1;
+        int nv = (y-cy)/stridey+1;
 
         int numImages = getX();
         int numPatches = nh*nv;
+        int totImages = numPatches*numImages;
 
-        for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+        MatrixGpu res(totImages , cx*cy*z);
+
+        res = -1.0;
+
+        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
         {
-            for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
             {
-                for(int ax = 0; ax < cx; ++ax)//x in convolution window
+                for(int ay = 0; ay < cy; ++ay)//y in convolution window
                 {
-                    for(int ay = 0; ay < cy; ++ay)//y in convolution window
+                    for(int ax = 0; ax < cx; ++ax)//x in convolution window
                     {
                         for(int az = 0; az < z; ++az)//image layers
                         {
-                            cudaMemcpy(res.getData()  + pixelInColMajor(ax, ay, az, px + py*nh, cx, cy, z, numPatches) //convolution window target
+                            cudaMemcpy(res.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
                                      , getDataConst() + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
                                      , sizeof(float)*numImages
                                      , cudaMemcpyDeviceToDevice);
+                            //goto breakit;
                         }
                     }
                 }
             }
         }
-        
+//breakit:
+
         return res;
     }
 
     MatrixGpu MatrixGpu::DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
     {
-
         //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex;
-        int nv = (y-cy)/stridey;
+        int nh = (x-cx)/stridex+1;
+        int nv = (y-cy)/stridey+1;
+        int numImages = getX() / (nh*nv);
 
-        assert(getX() == nh*nv);
         assert(getY() == cx*cy*z);
 
-        int numImages = getX() / (nh*nv);
 
         MatrixGpu res(numImages , x*y*z);
 
         int numPatches = nh*nv;
 
-        for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+        int totImages = numPatches*numImages;
+
+        res = -1.0;
+
+        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
         {
-            for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
             {
-                for(int ax = 0; ax < cx; ++ax)//x in convolution window
+                for(int ay = 0; ay < cy; ++ay)//y in convolution window
                 {
-                    for(int ay = 0; ay < cy; ++ay)//y in convolution window
+                    for(int ax = 0; ax < cx; ++ax)//x in convolution window
                     {
                         for(int az = 0; az < z; ++az)//image layers
                         {
                             cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
-                                     , getDataConst() + pixelInColMajor(ax, ay, az, px + py*nh, cx, cy, z, numPatches) //convolution window target
+                                     , getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
                                      , sizeof(float)*numImages
                                      , cudaMemcpyDeviceToDevice);
                         }
+                        //goto breakit2;
                     }
                 }
             }
         }
-        
+//breakit2:
         return res;
     }
 }

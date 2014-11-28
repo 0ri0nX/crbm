@@ -542,6 +542,11 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             MatrixGpu &operator^=(float inExponent);
             MatrixGpu &operator*=(float inVal);
 
+            //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
+            //it is expected that matrix has m.x==x and m.y == y*z
+            MatrixGpu Convolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
+            MatrixGpu DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
+
         protected:
             void Init(int inX, int inY, bool inTransposed)
             {
@@ -1354,6 +1359,88 @@ int MatrixGpu::m_Allocations = 0;
         return res;
     }
 
+    //a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
+    inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
+    {
+        return im + c*totim + a*z*totim + b*x*z*totim;
+    }
+
+    //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
+    //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
+    MatrixGpu MatrixGpu::Convolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
+    {
+        assert(getY() == x*y*z);
+
+        //horizontal and vertical number of patches
+        int nh = (x-cx)/stridex;
+        int nv = (y-cy)/stridey;
+
+        MatrixGpu res(nh*nv , cx*cy*z);
+
+        int numImages = getX();
+        int numPatches = nh*nv;
+
+        for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+        {
+            for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+            {
+                for(int ax = 0; ax < cx; ++ax)//x in convolution window
+                {
+                    for(int ay = 0; ay < cy; ++ay)//y in convolution window
+                    {
+                        for(int az = 0; az < z; ++az)//image layers
+                        {
+                            cudaMemcpy(res.getData()  + pixelInColMajor(ax, ay, az, px + py*nh, cx, cy, z, numPatches) //convolution window target
+                                     , getDataConst() + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
+                                     , sizeof(float)*numImages
+                                     , cudaMemcpyDeviceToDevice);
+                        }
+                    }
+                }
+            }
+        }
+        
+        return res;
+    }
+
+    MatrixGpu MatrixGpu::DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
+    {
+
+        //horizontal and vertical number of patches
+        int nh = (x-cx)/stridex;
+        int nv = (y-cy)/stridey;
+
+        assert(getX() == nh*nv);
+        assert(getY() == cx*cy*z);
+
+        int numImages = getX() / (nh*nv);
+
+        MatrixGpu res(numImages , x*y*z);
+
+        int numPatches = nh*nv;
+
+        for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+        {
+            for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+            {
+                for(int ax = 0; ax < cx; ++ax)//x in convolution window
+                {
+                    for(int ay = 0; ay < cy; ++ay)//y in convolution window
+                    {
+                        for(int az = 0; az < z; ++az)//image layers
+                        {
+                            cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
+                                     , getDataConst() + pixelInColMajor(ax, ay, az, px + py*nh, cx, cy, z, numPatches) //convolution window target
+                                     , sizeof(float)*numImages
+                                     , cudaMemcpyDeviceToDevice);
+                        }
+                    }
+                }
+            }
+        }
+        
+        return res;
+    }
 }
 
 #endif //MATRIX_H

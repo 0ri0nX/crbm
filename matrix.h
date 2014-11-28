@@ -211,6 +211,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
         EFE_MinusScalar,
         EFE_MultiplyScalar,
         EFE_DivideScalar,
+        EFE_InverseAndMultiply,
         EFE_Sigmoid,
     };
 
@@ -545,7 +546,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
             //it is expected that matrix has m.x==x and m.y == y*z
             MatrixGpu Convolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
-            MatrixGpu DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
+            MatrixGpu DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey, const MatrixGpu &inNormalizer) const;
+            MatrixGpu DeConvolveRaw(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
+            static MatrixGpu DeConvolveNormalizer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int number);
 
         protected:
             void Init(int inX, int inY, bool inTransposed)
@@ -1012,6 +1015,21 @@ int MatrixGpu::m_Allocations = 0;
                     case EFE_NotEqual:
                         outTarget[tid] = inSource[tid] != inParam1;
                         break;
+                    case EFE_PlusScalar:
+                        outTarget[tid] = inSource[tid] + inParam1;
+                        break;
+                    case EFE_MinusScalar:
+                        outTarget[tid] = inSource[tid] - inParam1;
+                        break;
+                    case EFE_MultiplyScalar:
+                        outTarget[tid] = inSource[tid] * inParam1;
+                        break;
+                    case EFE_DivideScalar:
+                        outTarget[tid] = inSource[tid] / inParam1;
+                        break;
+                    case EFE_InverseAndMultiply:
+                        outTarget[tid] = inParam1 / inSource[tid];
+                        break;
                     case EFE_Sigmoid:
                         outTarget[tid] = 1.0f/(1.0f + expf(-inSource[tid]));
                         break;
@@ -1419,7 +1437,69 @@ int MatrixGpu::m_Allocations = 0;
         return res;
     }
 
-    MatrixGpu MatrixGpu::DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
+    MatrixGpu MatrixGpu::DeConvolveNormalizer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int number)
+    {
+        //horizontal and vertical number of patches
+        int nh = (x-cx)/stridex+1;
+        int nv = (y-cy)/stridey+1;
+        int numImages = number;
+
+        MatrixGpu res(numImages , x*y*z);
+
+        //int numPatches = nh*nv;
+
+        //int totImages = numPatches*numImages;
+
+        res = 0.0;
+
+        static int ThreadsPerBlock = 512;
+        int num = numImages;
+        int blocks = (num - 1) / ThreadsPerBlock + 1;
+
+        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+        {
+            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+            {
+                for(int ay = 0; ay < cy; ++ay)//y in convolution window
+                {
+                    for(int ax = 0; ax < cx; ++ax)//x in convolution window
+                    {
+                        for(int az = 0; az < z; ++az)//image layers
+                        {
+                            //float *dFrom = getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages); //convolution window target
+                            float *dTo = res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages); //convolution window source
+                            applyFunction<<<blocks, ThreadsPerBlock>>>(dTo, dTo, numImages, EFE_PlusScalar, 1.0f);
+
+                            //cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
+                            //         , getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
+                            //         , sizeof(float)*numImages
+                            //         , cudaMemcpyDeviceToDevice);
+                        }
+                        //goto breakit2;
+                    }
+                }
+            }
+        }
+//breakit2:
+        num = res.getX()*res.getY();
+        blocks = (num - 1) / ThreadsPerBlock + 1;
+        applyFunction<<<blocks, ThreadsPerBlock>>>(res.getData(), res.getDataConst(), num, EFE_InverseAndMultiply, 1.0f);
+
+        return res;
+    }
+
+    MatrixGpu MatrixGpu::DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey, const MatrixGpu &inNormalizer) const
+    {
+        MatrixGpu res = DeConvolveRaw(x, y, z, cx, cy, stridex, stridey);
+        cout << res.getX() << " x " << res.getY() << endl;
+        cout << inNormalizer.getX() << " x " << inNormalizer.getY() << endl;
+
+        res = res*inNormalizer;
+
+        return res;
+    }
+
+    MatrixGpu MatrixGpu::DeConvolveRaw(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
     {
         //horizontal and vertical number of patches
         int nh = (x-cx)/stridex+1;
@@ -1435,7 +1515,11 @@ int MatrixGpu::m_Allocations = 0;
 
         int totImages = numPatches*numImages;
 
-        res = -1.0;
+        res = 0.0;
+
+        static int ThreadsPerBlock = 512;
+        int num = numImages;
+        int blocks = (num - 1) / ThreadsPerBlock + 1;
 
         for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
         {
@@ -1447,10 +1531,14 @@ int MatrixGpu::m_Allocations = 0;
                     {
                         for(int az = 0; az < z; ++az)//image layers
                         {
-                            cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
-                                     , getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
-                                     , sizeof(float)*numImages
-                                     , cudaMemcpyDeviceToDevice);
+                            float *dFrom = getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages); //convolution window target
+                            float *dTo = res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages); //convolution window source
+                            parallelMatrixOperationBinary<<<blocks, ThreadsPerBlock>>>(dTo, dFrom, numImages, EFEB_Plus, dTo);
+
+                            //cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
+                            //         , getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
+                            //         , sizeof(float)*numImages
+                            //         , cudaMemcpyDeviceToDevice);
                         }
                         //goto breakit2;
                     }

@@ -270,6 +270,10 @@ int main(int argc, char** argv)
     int minIndex = 0;
 
     bool ONE_ROW = true;
+
+    Mat normalizer = Mat::DeConvolveNormalizer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX()); //batchSize);
+    saveGpuMatrix(normalizer, string(argv[1]) + ".normalizer");
+
     
     for(int i = 0; i < iterations; ++i)
     {
@@ -283,7 +287,7 @@ int main(int argc, char** argv)
         saveGpuMatrix(x, string(argv[1]) + ".convolved");
 
         Mat reverse;
-        reverse = x.DeConvolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+        reverse = x.DeConvolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, normalizer);
 
         saveGpuMatrix(reverse, string(argv[1]) + ".reversed");
         exit(1);

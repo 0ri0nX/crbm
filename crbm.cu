@@ -227,24 +227,26 @@ int main(int argc, char** argv)
     }
 
     //image-size
-    int im_x = 3;
-    int im_y = 4;
-    int im_z = 2;
+    int im_x = 200;
+    int im_y = 200;
+    int im_z = 3;
 
     //convolution-size
-    int im_cx = 2;
-    int im_cy = 2;
+    int im_cx = 10;
+    int im_cy = 10;
 
     //stride-size
-    int im_stridex = 1;
-    int im_stridey = 1;
+    int im_stridex = 5;
+    int im_stridey = 5;
 
     int pn = convolutionPatchesNumber(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+    Mat x, xraw, y, x2, y2, dw1, dw2, err, lastW;
+    x = xx.Convolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
 
-    Mat w(im_x*im_y*im_z, hidden); //init weights
+    Mat w(x.getY(), hidden); //init weights
     cout << xCpu->getX() << ", " << xx.getX() << ", " << xCpu->getY() << ", " << hidden << endl;
 
-    if(xCpu->getX() != xx.getY() || xCpu->getY() != hidden)
+    if(xCpu->getX() != w.getX() || xCpu->getY() != w.getY())
     {
         w.RandNormal(0.0f, 1.0f/(10*hidden));
         cout << "weight matrix randomized!" << endl;
@@ -261,7 +263,6 @@ int main(int argc, char** argv)
     //w = 0.0f;
     ms("w", w);
 
-    Mat x, xraw, y, x2, y2, dw1, dw2, err, lastW;
     lastW = w;
 
     cout << endl;
@@ -271,26 +272,27 @@ int main(int argc, char** argv)
 
     bool ONE_ROW = true;
 
-    Mat normalizer = Mat::DeConvolveNormalizer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX()); //batchSize);
-    saveGpuMatrix(normalizer, string(argv[1]) + ".normalizer");
 
-    
+    msgG("xxxxx", x);
+    msgG("wwwww", w);
+
+  
     for(int i = 0; i < iterations; ++i)
     {
-        Mat xraw = xx;
+        //Mat xraw = xx;
         //Mat xraw = xx.Sample(batchSize);
 
-        x = xraw.Convolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+        //x = xraw.Convolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
 
-        cout << "x:" << x.getX() << ", y:" << x.getY() << endl;
+        //cout << "x:" << x.getX() << ", y:" << x.getY() << endl;
 
-        saveGpuMatrix(x, string(argv[1]) + ".convolved");
+        //saveGpuMatrix(x, string(argv[1]) + ".convolved");
 
-        Mat reverse;
-        reverse = x.DeConvolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, normalizer);
+        //Mat reverse;
+        //reverse = x.DeConvolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, normalizer);
 
-        saveGpuMatrix(reverse, string(argv[1]) + ".reversed");
-        exit(1);
+        //saveGpuMatrix(reverse, string(argv[1]) + ".reversed");
+        //exit(1);
 
         y = Mult(x, w); // matrixwise -  y.shape = (dataA.x, weights.y) == (dataB.x, dataB.y)
         //msgG("y", y);
@@ -330,7 +332,7 @@ int main(int argc, char** argv)
 
         ms("w = w + dw", w);
 
-        if(i % 100 == 0 || i+1 == iterations )
+        if(i % 50 == 0 || i+1 == iterations )
         {
             cout << i << ": ";
             float terr = computeError(x, x2);
@@ -359,13 +361,16 @@ int main(int argc, char** argv)
     msgC("res", res);
     saveMatrix(res, string(argv[1]) + ".weights");
 
-    y = Mult(xx, w);
+    y = Mult(x, w);
     //y = y.Sigmoid();
     MatrixCpu resy = y;
     saveMatrix(resy, string(argv[1]) + ".transform");
     x2 = Mult(y, w.T());
     //x2 = x2.Sigmoid();
-    MatrixCpu resx = x2;
+    Mat reverse, normalizer;
+    normalizer = x.DeConvolveNormalizer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX());
+    reverse = x2.DeConvolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, normalizer);
+    MatrixCpu resx = reverse;
     saveMatrix(resx, string(argv[1]) + ".reconstruct");
 
 

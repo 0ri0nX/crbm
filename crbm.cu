@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <string>
+#include <time.h>
 
 using namespace std;
 
@@ -24,34 +25,63 @@ using namespace std;
 
 #include "matrix.h"
 
+class Timer
+{
+    public:
+        Timer(void)
+        {
+            tic();
+        }
+
+        void tic(void)
+        {
+            clock_gettime(CLOCK_MONOTONIC, &m_TimeSpec);
+        }
+
+        void tac(const string &inComment = "")
+        {
+            timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+
+            float t = (ts.tv_sec - m_TimeSpec.tv_sec) + (ts.tv_nsec - m_TimeSpec.tv_nsec)/10e9;
+
+            cout << inComment << t << " sec" << endl;
+        }
+
+    private:
+
+        timespec m_TimeSpec;
+};
 
 
 using namespace YAMATH;
 
-void loadMatrix(MatrixCpu &inM, const string& filename, bool inTransposed = false)
-{
-    cout << "loading [" << filename << "] ... " << endl;
-    ifstream f(filename.c_str());
-    inM.Load(f, inTransposed);
-    f.close();
-}
+//class CRBMLayer
+//{
+//    //image-size
+//    int m_x = 200;
+//    int m_y = 200;
+//    int m_z = 3;
+//
+//    //convolution-size
+//    int m_cx = 10;
+//    int m_cy = 10;
+//
+//    //stride-size
+//    int m_stridex = 5;
+//    int m_stridey = 5;
+//
+//    MatrixGpu m_Weights;
+//
+//    int pn = convolutionPatchesNumber(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+//    Mat x, xraw, y, x2, y2, dw1, dw2, err, lastW;
+//    x = xx.Convolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+//
+//    Mat w(x.getY(), hidden); //init weights
+//
+//};
 
-void saveMatrix(MatrixCpu &inM, const string &filename)
-{
-    cout << "saving [" << filename << "] ... " << endl;
-    ofstream f(filename.c_str());
-    inM.Save(f);
-    f.close();
-}
-
-void saveGpuMatrix(MatrixGpu &inM, const string &filename)
-{
-    MatrixCpu resx = inM;
-    saveMatrix(resx, filename);
-}
-
-
-void msgC(char * inMsg, const MatrixCpu &x)
+void msgC(const char * inMsg, const MatrixCpu &x)
 {
     int n = x.getX()*x.getY();
     if(n > 400)
@@ -71,11 +101,40 @@ void msgC(char * inMsg, const MatrixCpu &x)
     }
 }
 
-void msgG(char * inMsg, const MatrixGpu &inM)
+void msgG(const char * inMsg, const MatrixGpu &inM)
 {
     MatrixCpu x = inM;
     msgC(inMsg, x);
 }
+
+void loadMatrix(MatrixCpu &inM, const string& filename, bool inTransposed = false)
+{
+    cout << "loading [" << filename << "] ... " << endl;
+    Timer t;
+    ifstream f(filename.c_str());
+    inM.Load(f, inTransposed);
+    f.close();
+    t.tac("   ... done in ");
+    msgC(filename.c_str(), inM);
+}
+
+void saveMatrix(MatrixCpu &inM, const string &filename)
+{
+    cout << "saving [" << filename << "] ... " << endl;
+    Timer t;
+    ofstream f(filename.c_str());
+    inM.Save(f);
+    f.close();
+    t.tac("   ... done in ");
+    msgC(filename.c_str(), inM);
+}
+
+void saveGpuMatrix(MatrixGpu &inM, const string &filename)
+{
+    MatrixCpu resx = inM;
+    saveMatrix(resx, filename);
+}
+
 
 
 void ms(char * inMsg, const MatrixGpu &inM)
@@ -238,10 +297,22 @@ int main(int argc, char** argv)
     //stride-size
     int im_stridex = 5;
     int im_stridey = 5;
+    Timer timer;
 
-    int pn = convolutionPatchesNumber(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+    int transX, transY;
+
+    convolutionPatchesNumber(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, transX, transY);
+
+    cout << "On image " << im_x << "x" << im_y << "x" << im_z << " applied convolution " << im_cx << "x" << im_cy << " with stride " << im_stridex << "x" << im_stridey << endl;
+    cout << "It resulted into " << transX << "x" << transY << " patches." << endl;
+
+    //int pn = transX*transY;
+
     Mat x, xraw, y, x2, y2, dw1, dw2, err, lastW;
+
+    timer.tic();
     x = xx.Convolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
+    timer.tac("Convolve: ");
 
     Mat w(x.getY(), hidden); //init weights
     cout << xCpu->getX() << ", " << xx.getX() << ", " << xCpu->getY() << ", " << hidden << endl;
@@ -364,12 +435,20 @@ int main(int argc, char** argv)
     y = Mult(x, w);
     //y = y.Sigmoid();
     MatrixCpu resy = y;
+    saveMatrix(resy, string(argv[1]) + ".transformRaw");
+
+    resy.Reshape(xx.getX(), transX*transY*hidden);
+
     saveMatrix(resy, string(argv[1]) + ".transform");
     x2 = Mult(y, w.T());
     //x2 = x2.Sigmoid();
     Mat reverse, normalizer;
+    timer.tic();
     normalizer = x.DeConvolveNormalizer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX());
+    timer.tac("DeConvolveNormalizer: ");
+    timer.tic();
     reverse = x2.DeConvolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, normalizer);
+    timer.tac("DeConvolve: ");
     MatrixCpu resx = reverse;
     saveMatrix(resx, string(argv[1]) + ".reconstruct");
 

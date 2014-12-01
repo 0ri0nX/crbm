@@ -333,6 +333,14 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             float* getDataConst(void) const { return m_Data; }
             float* getData(void) { return m_Data; }
 
+            void Reshape(int inX, int inY)
+            {
+                assert(getX()*getY() == inX*inY);
+
+                m_X = inX;
+                m_Y = inY;
+            }
+
             inline void set(int inX, int inY, float inValue)
             {
                 m_Data[IDX2C(inX, inY, getX())] = inValue;
@@ -1385,13 +1393,11 @@ int MatrixGpu::m_Allocations = 0;
         return idx;
     }
 
-    int convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, int stridey)
+    void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, int stridey, int &outX, int &outY)
     {
 
-        int nh = (x-cx)/stridex+1;
-        int nv = (y-cy)/stridey+1;
-
-        return nh*nv;
+        outX = (x-cx)/stridex+1;
+        outY = (y-cy)/stridey+1;
     }
 
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
@@ -1410,6 +1416,20 @@ int MatrixGpu::m_Allocations = 0;
 
         MatrixGpu res(totImages , cx*cy*z);
 
+//#define STREAMS_ON
+
+#ifdef STREAMS_ON
+        // allocate and initialize an array of stream handles
+        int nstreams = 14;
+        cout << "async " << nstreams << endl;
+        cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
+        for(int i = 0; i < nstreams; i++)
+        {
+            cudaStreamCreate(&(streams[i]));
+        }
+        int indexForStream = 0;
+#endif //STREAMS_ON
+
         res = -1.0;
 
         for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
@@ -1422,10 +1442,21 @@ int MatrixGpu::m_Allocations = 0;
                     {
                         for(int az = 0; az < z; ++az)//image layers
                         {
-                            cudaMemcpy(res.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
+#ifdef STREAMS_ON
+                            cudaMemcpyAsync
+#else //STREAMS_ON
+                            cudaMemcpy
+#endif //STREAMS_ON
+
+                                (res.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
                                      , getDataConst() + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
                                      , sizeof(float)*numImages
-                                     , cudaMemcpyDeviceToDevice);
+                                     , cudaMemcpyDeviceToDevice
+#ifdef STREAMS_ON
+                                     , streams[(++indexForStream) % nstreams]
+#endif //STREAMS_ON
+
+                                     );
                             //goto breakit;
                         }
                     }
@@ -1433,6 +1464,15 @@ int MatrixGpu::m_Allocations = 0;
             }
         }
 //breakit:
+
+#ifdef STREAMS_ON
+        // release resources
+        for(int i = 0; i < nstreams; i++)
+        {
+            cudaDeviceSynchronize();
+            cudaStreamDestroy(streams[i]);
+        }
+#endif //STREAMS_ON
 
         return res;
     }

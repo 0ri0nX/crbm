@@ -285,6 +285,21 @@ int main(int argc, char** argv)
         msgC("w", *xCpu);
     }
 
+#define TEST
+#ifdef TEST
+    //image-size
+    int im_x = 3;
+    int im_y = 4;
+    int im_z = 2;
+
+    //convolution-size
+    int im_cx = 2;
+    int im_cy = 2;
+
+    //stride-size
+    int im_stridex = 1;
+    int im_stridey = 1;
+#else
     //image-size
     int im_x = 200;
     int im_y = 200;
@@ -297,6 +312,8 @@ int main(int argc, char** argv)
     //stride-size
     int im_stridex = 5;
     int im_stridey = 5;
+#endif
+
     Timer timer;
 
     int transX, transY;
@@ -434,12 +451,26 @@ int main(int argc, char** argv)
 
     y = Mult(x, w);
     //y = y.Sigmoid();
+    msgG("y", y);
+    //y.Reshape(hidden*xx.getX(), transX*transY);
+    //msgG("reshaped(y)", y);
+    //MatrixCpu resy = y;
+    //saveMatrix(resy, string(argv[1]) + ".transformRaw");
+
+    //exit(1);
+    
+    Mat yy = y.T();
+    yy.MakeHardCopy();
+    msgG("transposed(y)", yy);
+    //saveMatrix(resy, string(argv[1]) + ".transformRawTransposed");
+
+    
     MatrixCpu resy = y;
-    saveMatrix(resy, string(argv[1]) + ".transformRaw");
-
     resy.Reshape(xx.getX(), transX*transY*hidden);
+    msgC("res(y)", resy);
 
-    saveMatrix(resy, string(argv[1]) + ".transform");
+    //saveMatrix(resy, string(argv[1]) + ".transform");
+    exit(1);
     x2 = Mult(y, w.T());
     //x2 = x2.Sigmoid();
     Mat reverse, normalizer;

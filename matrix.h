@@ -103,6 +103,16 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 }
             }
 
+            GpuData(const GpuData<T> &inVal)
+            {
+                m_Holder = inVal.m_Holder;
+
+                if(m_Holder != NULL)
+                {
+                    m_Holder->m_Counter += 1;
+                }
+            }
+
             ~GpuData(void)
             {
                 Dec();
@@ -376,9 +386,11 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 if(m_X != inX || m_Y != inY)
                 {
                     delete [] m_Data;
-                    Init(inX, inY, inInit);
                 }
+                Init(inX, inY, inInit);
             }
+            MatrixCpu &operator=(const MatrixGpu &inMatrix);
+            MatrixCpu &operator=(const MatrixCpu &inMatrix);
 
         protected:
             void Init(int inX, int inY, const float *inInit = NULL)
@@ -460,6 +472,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 return m;
             }
 
+            void MakeHardCopy(void);
+
             MatrixGpu Sample(int inRowsNum) const;
 
             void Reset(int inX, int inY, bool inTransposed = false)
@@ -474,6 +488,14 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 {
                     m_Transposed = inTransposed;
                 }
+            }
+
+            void Reshape(int inX, int inY)
+            {
+                assert(getX()*getY() == inX*inY);
+
+                m_X = inX;
+                m_Y = inY;
             }
 
             void RandUniform(unsigned long long inSeed = 0)//uniform randomness (0.0f .. 1.0f]
@@ -565,12 +587,14 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 m_Y = inY;
                 m_Data.Reset(inX*inY);
                 m_Transposed = inTransposed;
+                m_ShallowCopy = false;
             }
 
             int m_X;
             int m_Y;
             GpuData<float> m_Data;
             bool m_Transposed;
+            bool m_ShallowCopy;
 
 #ifdef DEBUG_MATRIX_CLASS
             static int m_Allocations;
@@ -864,6 +888,48 @@ int MatrixGpu::m_Allocations = 0;
     };
 
 
+    __global__ void transposeSimple(float *outData, const float *inData, int inSourceX, int inSourceY)
+    {
+        extern __shared__ float tile[];
+
+        int sharedIdx = threadIdx.x*blockDim.y + threadIdx.y;
+        
+        int sourceX = blockDim.x*blockIdx.x + threadIdx.x;
+        int sourceY = blockDim.y*blockIdx.y + threadIdx.y;
+
+        //range-check
+        if(sourceX < inSourceX && sourceY < inSourceY)
+        {
+            int sourceIdx = sourceY*inSourceX + sourceX;
+            int targetIdx = sourceX*inSourceY + sourceY;
+
+            tile[sharedIdx] = inData[sourceIdx];
+            
+            __syncthreads();
+
+            outData[targetIdx] = tile[sharedIdx];
+        }
+    }
+
+    void transpose(float *outData, const float *inData, int inSourceX, int inSourceY)
+        {
+            static int ThreadsPerBlock = 96; //shared memory need to be at least sizeof(float) * ThreadsPerBlock^2
+
+            int sx = min(ThreadsPerBlock, inSourceX);
+            int sy = min(ThreadsPerBlock, inSourceY);
+
+            dim3 threadsPerBlock(sx, sy, 1);
+
+            dim3 blocksPerGrid(
+                      (inSourceX - 1) / sx + 1
+                    , (inSourceY - 1) / sy + 1
+                    , 1);
+
+            transposeSimple<<<blocksPerGrid, threadsPerBlock, sx*sy*sizeof(float)>>>(outData, inData, inSourceX, inSourceY);
+            gpuErrchk( cudaPeekAtLastError() );
+            gpuErrchk( cudaDeviceSynchronize() );
+        }
+
 #define TILE_DIM 32
 #define BLOCK_ROWS 8
 
@@ -873,6 +939,7 @@ int MatrixGpu::m_Allocations = 0;
         
         int x = blockIdx.x * TILE_DIM + threadIdx.x;
         int y = blockIdx.y * TILE_DIM + threadIdx.y;
+
         int width = gridDim.x * TILE_DIM;
         
         for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
@@ -1115,6 +1182,7 @@ int MatrixGpu::m_Allocations = 0;
             if(inShallowCopy)
             {
                 m_Data = inMatrix.m_Data;
+                m_ShallowCopy = true;
             }
             else
             {
@@ -1587,6 +1655,51 @@ int MatrixGpu::m_Allocations = 0;
         }
 //breakit2:
         return res;
+    }
+
+    void MatrixGpu::MakeHardCopy(void)
+    {
+        if(m_ShallowCopy || isTrans())
+        {
+            GpuData<float> sourceData = m_Data;
+            m_Data.Reset();
+
+            if(isTrans())
+            {
+                int x = getX();
+                int y = getY();
+
+                //transpose
+                Init(y, x, false);
+
+                transpose(getData(), sourceData.raw(), x, y);
+            }
+            else
+            {
+                //copy-only
+                Init(getX(), getY(), false);
+
+                cudaMemcpy(getData(), sourceData.raw(), getX()*getY()*sizeof(float), cudaMemcpyDeviceToDevice);
+            }
+        }
+    }
+
+    MatrixCpu &MatrixCpu::operator=(const MatrixGpu &inMatrix)
+    {
+        Reset(inMatrix.getX(), inMatrix.getY());
+        cudaMemcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToHost);
+
+        return *this;
+    }
+
+    MatrixCpu &MatrixCpu::operator=(const MatrixCpu &inMatrix)
+    {
+        if(this != &inMatrix)
+        {
+            Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
+        }
+
+        return *this;
     }
 }
 

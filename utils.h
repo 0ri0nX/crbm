@@ -71,7 +71,7 @@ void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTran
     inM.Load(f, inTransposed);
     f.close();
     t.tac("   ... done in ");
-    msgC(filename.c_str(), inM);
+    //msgC(filename.c_str(), inM);
 }
 
 void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
@@ -82,7 +82,7 @@ void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
     inM.Save(f);
     f.close();
     t.tac("   ... done in ");
-    msgC(filename.c_str(), inM);
+    //msgC(filename.c_str(), inM);
 }
 
 void saveMatrix(const YAMATH::MatrixGpu &inM, const std::string &filename)

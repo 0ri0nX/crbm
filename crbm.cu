@@ -461,6 +461,8 @@ int main(int argc, char** argv)
     msgG("y", y);
     Mat yyy = y.TransformToUpperLayer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX());
     msgG("trans(y)", yyy);
+    MatrixCpu resy = yyy;
+    saveMatrix(resy, string(argv[1]) + ".transform");
     Mat zzz = yyy.TransformFromUpperLayer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX());
     msgG("retranst(trans(y))", zzz);
 

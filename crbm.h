@@ -14,10 +14,8 @@ class CRBMLayer
 
         float learnAll(const YAMATH::MatrixGpu &inData, int batchSize = 256, int globalIterations = 1000, int batchIterations = 100);
         float learnBatch(const YAMATH::MatrixGpu &inBatch, int batchIterations = 100);
-        void transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
-        float reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
-
-
+        void transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
+        void reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
 
         //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
         //it is expected that matrix has m.x==x and m.y == y*z
@@ -25,11 +23,15 @@ class CRBMLayer
         void DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch);
         void DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
         void SetDeConvolveNormalizer(int numImages);
+        void ConvolutionPatchesNumber(int &outX, int &outY) const;
 
         //all parameters are from this layer
-        void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch, int numImages) const;
+        void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
         //all parameters are from this layer as well
-        void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch, int numImages) const;
+        void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
+
+        static void FunctionHidden(YAMATH::MatrixGpu &inHidden);
+        static void FunctionVisible(YAMATH::MatrixGpu &inVisible);
 
     protected:
 
@@ -54,26 +56,26 @@ class CRBMLayer
         YAMATH::MatrixGpu m_Normalizer;
 };
 
-CRBMLayer::CRBMLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int hidden)
-    : m_x(x), m_y(y), m_z(z), m_cx(cx), m_cy(cy), m_stridex(stridex), m_stridey(stridey), m_Weights(1), m_Normalizer(1)
-{
-}
-
-
-//a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
-inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
-{
-    int idx = im + c*totim + a*z*totim + b*x*z*totim;
-    //cout << "idx: " << idx << endl;
-    return idx;
-}
-
-void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, int stridey, int &outX, int &outY)
-{
-
-    outX = (x-cx)/stridex+1;
-    outY = (y-cy)/stridey+1;
-}
+    CRBMLayer::CRBMLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int hidden)
+        : m_x(x), m_y(y), m_z(z), m_cx(cx), m_cy(cy), m_stridex(stridex), m_stridey(stridey), m_Weights(cx*cy*z, hidden), m_Normalizer(1)
+    {
+        m_Weights.RandNormal(0.0f, 1.0f/(10.0*hidden));
+        cout << "weight matrix randomized!" << endl;
+    }
+    
+    //a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
+    inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
+    {
+        int idx = im + c*totim + a*z*totim + b*x*z*totim;
+        //cout << "idx: " << idx << endl;
+        return idx;
+    }
+    
+    void CRBMLayer::ConvolutionPatchesNumber(int &outX, int &outY) const
+    {
+        outX = (m_x-m_cx)/m_stridex+1;
+        outY = (m_y-m_cy)/m_stridey+1;
+    }
 
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
     //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
@@ -82,8 +84,8 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
         assert(inBatch.getY() == m_x*m_y*m_z);
 
         //horizontal and vertical number of patches
-        int nh = (m_x-m_cx)/m_stridex+1;
-        int nv = (m_y-m_cy)/m_stridey+1;
+        int nh, nv;
+        ConvolutionPatchesNumber(nh, nv);
 
         int numImages = inBatch.getX();
         int numPatches = nh*nv;
@@ -162,8 +164,8 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
         m_Normalizer.Reset(numImages , m_x*m_y*m_z);
 
         //horizontal and vertical number of patches
-        int nh = (m_x-m_cx)/m_stridex+1;
-        int nv = (m_y-m_cy)/m_stridey+1;
+        int nh, nv;
+        ConvolutionPatchesNumber(nh, nv);
 
         static int ThreadsPerBlock = 512;
         int blocks = (numImages - 1) / ThreadsPerBlock + 1;
@@ -205,8 +207,8 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
     void CRBMLayer::DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         //horizontal and vertical number of patches
-        int nh = (m_x-m_cx)/m_stridex+1;
-        int nv = (m_y-m_cy)/m_stridey+1;
+        int nh, nv;
+        ConvolutionPatchesNumber(nh, nv);
 
         int numImages = inBatch.getX() / (nh*nv);
 
@@ -245,11 +247,13 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
     }
 
     //all parameters are from this layer
-    void CRBMLayer::RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch, int numImages) const
+    void CRBMLayer::RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         //horizontal and vertical number of patches
-        int nh = (m_x-m_cx)/m_stridex+1;
-        int nv = (m_y-m_cy)/m_stridey+1;
+        int nh, nv;
+        ConvolutionPatchesNumber(nh, nv);
+
+        int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*m_hidden);
 
         int numPatches = nh*nv;
         int total = inBatch.getX()*inBatch.getY();
@@ -317,21 +321,19 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
     }
 
     //all parameters are from this layer as well
-    void CRBMLayer::UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch, int numImages) const
+    void CRBMLayer::UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         //horizontal and vertical number of patches
-        int nh = (m_x-m_cx)/m_stridex+1;
-        int nv = (m_y-m_cy)/m_stridey+1;
+        int nh, nv;
+        ConvolutionPatchesNumber(nh, nv);
+
+        int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*m_hidden);
 
         int numPatches = nh*nv;
         int total = inBatch.getX()*inBatch.getY();
-        int imageAllInOneSize = total/numImages;
-        //int totImages = numPatches*numImages;
 
-        int features = imageAllInOneSize/numPatches;
-
-        //res must be patches-number*rest
-        outBatch.Reset(numPatches*numImages, features);
+        //res must be patches-number*rest ?
+        outBatch.Reset(numPatches*numImages, m_hidden);
 
 //#define STREAMS_ON
 
@@ -351,12 +353,12 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
         outBatch = -1.0;
 
         cout << "patches:" << numPatches << endl;
-        cout << "features:" << features << endl;
+        cout << "features:" << m_hidden << endl;
         cout << "images:" << numImages << endl;
 
         for(int p = 0; p < numPatches; ++p)//p - patch number
         {
-            for(int f = 0; f < features; ++f)//f - number of features (hidden layer)
+            for(int f = 0; f < m_hidden; ++f)//f - number of features (hidden layer)
             {
                         {
 #ifdef STREAMS_ON
@@ -366,7 +368,7 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
 #endif //STREAMS_ON
 
                                 (outBatch.getData() + (f*numPatches + p)*numImages //target
-                                     , inBatch.getDataConst() + (f + p*features)*numImages //source
+                                     , inBatch.getDataConst() + (f + p*m_hidden)*numImages //source
                                      , sizeof(float)*numImages
                                      , cudaMemcpyDeviceToDevice
 #ifdef STREAMS_ON
@@ -390,6 +392,120 @@ void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, 
 #endif //STREAMS_ON
 
     }
+
+    float computeError(const YAMATH::MatrixGpu &inInp, const YAMATH::MatrixGpu &inOut)
+    {
+        YAMATH::MatrixGpu r2, r3;
+        r2 = inInp - inOut;
+        r2 ^= 2.0f;
+        r3 = r2.Sum();
+    
+        YAMATH::MatrixCpu rr = r3;
+    
+        return rr.getDataConst()[0]/inInp.getX();
+    }
+
+    float CRBMLayer::learnBatch(const YAMATH::MatrixGpu &inBatch, int batchIterations)
+    {
+        int LOG_MODULO = 10;
+        //Timer timer;
+
+        int transX, transY;//transformed size
+        ConvolutionPatchesNumber(transX, transY);
+
+        cout << "On image " << m_x << "x" << m_y << "x" << m_z << " applied convolution " << m_cx << "x" << m_cy << " with stride " << m_stridex << "x" << m_stridey << endl;
+        cout << "It resulted into " << transX << "x" << transY << " patches." << endl;
+
+        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, err, lastW;
+
+        //timer.tic();
+        Convolve(inBatch, x);
+        //timer.tac("Convolve: ");
+
+        //lastW = m_Weights;
+
+        bool ONE_ROW = true;
+        float error = -1.0f;
+
+        for(int i = 0; i < batchIterations; ++i)
+        {
+            y = Mult(x, m_Weights);
+            FunctionHidden(y);
+
+            x2 = Mult(y, m_Weights.T());
+            FunctionVisible(x2);
+
+            y2 = Mult(x2, m_Weights);
+            FunctionHidden(y2);
+
+            dw1 = Mult(x.T(), y);
+            dw2 = Mult(x2.T(), y2);
+
+            dw1 *= (m_LearningSpeed/x.getX());
+            dw2 *= (m_LearningSpeed/x.getX());
+
+            m_Weights = m_Weights + dw1;
+            m_Weights = m_Weights - dw2;
+
+            //lastW *= 0.00001;
+            //w = w - lastW;
+            //lastW = w;
+
+            if(i % LOG_MODULO == 0 || i+1 == batchIterations)
+            {
+                error = computeError(x, x2);
+                cout << i << ": " << error << flush;
+
+                if(ONE_ROW)
+                {
+                    cout << "                  " << "\r" << flush;
+                }
+                else
+                {
+                    cout << endl;
+                }
+            }
+        }
+        cout << endl;
+
+        return error;
+    }
+
+    void CRBMLayer::FunctionHidden(YAMATH::MatrixGpu &inHidden)
+    {
+        //inHidden = inHidden.Sigmoid();
+    }
+    void CRBMLayer::FunctionVisible(YAMATH::MatrixGpu &inVisible)
+    {
+        //inVisible = inVisible.Sigmoid();
+    }
+
+    void  CRBMLayer::transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const
+    {
+        YAMATH::MatrixGpu x, y;
+
+        Convolve(inData, x);
+
+        y = Mult(x, m_Weights);
+        FunctionHidden(y);
+
+        RawOutput2UpperLayer(y, outData);
+    }
+
+    void CRBMLayer::reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData)
+    {
+        YAMATH::MatrixGpu x, y;
+
+        UpperLayer2RawOutput(inData, y);
+
+        x = Mult(y, m_Weights.T());
+        FunctionVisible(x);
+
+        DeConvolve(x, outData);
+    }
+
+
+
 }//namespace CRBM
 
 #endif //CRBM_H

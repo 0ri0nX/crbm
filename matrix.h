@@ -329,8 +329,19 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                     {
                         outStream << " " << m_Data[IDX2C(i, j, m_X)];
                     }
+
                     outStream << std::endl;
                 }
+                if(0)//raw data
+                {
+                    outStream << "raw:";
+                    for(int j = 0; j < m_Y*m_Y; ++j)
+                    {
+                        outStream << " " << m_Data[j];
+                    }
+                    outStream << std::endl;
+                }
+
             }
 
             ~MatrixCpu(void)
@@ -579,6 +590,11 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             MatrixGpu DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey, const MatrixGpu &inNormalizer) const;
             MatrixGpu DeConvolveRaw(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
             static MatrixGpu DeConvolveNormalizer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int number);
+
+            //all parameters are from lower layer
+            MatrixGpu TransformToUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const;
+            //all parameters are from lower layer as well
+            MatrixGpu TransformFromUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const;
 
         protected:
             void Init(int inX, int inY, bool inTransposed)
@@ -1687,6 +1703,7 @@ int MatrixGpu::m_Allocations = 0;
     MatrixCpu &MatrixCpu::operator=(const MatrixGpu &inMatrix)
     {
         Reset(inMatrix.getX(), inMatrix.getY());
+        assert(!inMatrix.isTrans());
         cudaMemcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToHost);
 
         return *this;
@@ -1700,6 +1717,159 @@ int MatrixGpu::m_Allocations = 0;
         }
 
         return *this;
+    }
+
+    MatrixGpu MatrixGpu::TransformToUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const
+    {
+        //MatrixGpu m = T();
+        //m.MakeHardCopy();
+
+        //horizontal and vertical number of patches
+        int nh = (x-cx)/stridex+1;
+        int nv = (y-cy)/stridey+1;
+
+        int numPatches = nh*nv;
+        int total = getX()*getY();
+        int imageAllInOneSize = total/numImages;
+        //int totImages = numPatches*numImages;
+
+        int features = imageAllInOneSize/numPatches;
+
+        MatrixGpu res(numImages, imageAllInOneSize);
+
+//#define STREAMS_ON
+
+#ifdef STREAMS_ON
+        // allocate and initialize an array of stream handles
+        int nstreams = 14;
+        cout << "async " << nstreams << endl;
+        cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
+        for(int i = 0; i < nstreams; i++)
+        {
+            cudaStreamCreate(&(streams[i]));
+        }
+        int indexForStream = 0;
+#endif //STREAMS_ON
+
+        res = -1.0;
+
+        cout << "patches:" << numPatches << endl;
+        cout << "features:" << features << endl;
+        cout << "images:" << numImages << endl;
+
+        for(int p = 0; p < numPatches; ++p)//p - patch number
+        {
+            for(int f = 0; f < features; ++f)//f - number of features (hidden layer)
+            {
+                        {
+#ifdef STREAMS_ON
+                            cudaMemcpyAsync
+#else //STREAMS_ON
+                            cudaMemcpy
+#endif //STREAMS_ON
+
+                                (res.getData() + (f + p*features)*numImages //target
+                                     , getDataConst() + (f*numPatches + p)*numImages //source
+                                     , sizeof(float)*numImages
+                                     , cudaMemcpyDeviceToDevice
+#ifdef STREAMS_ON
+                                     , streams[(++indexForStream) % nstreams]
+#endif //STREAMS_ON
+
+                                     );
+                            //goto breakit;
+                        }
+            }
+        }
+//breakit:
+
+#ifdef STREAMS_ON
+        // release resources
+        for(int i = 0; i < nstreams; i++)
+        {
+            cudaDeviceSynchronize();
+            cudaStreamDestroy(streams[i]);
+        }
+#endif //STREAMS_ON
+
+        return res;
+    }
+
+    MatrixGpu MatrixGpu::TransformFromUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const
+    {
+        //MatrixGpu m = T();
+        //m.MakeHardCopy();
+
+        //horizontal and vertical number of patches
+        int nh = (x-cx)/stridex+1;
+        int nv = (y-cy)/stridey+1;
+
+        int numPatches = nh*nv;
+        int total = getX()*getY();
+        int imageAllInOneSize = total/numImages;
+        //int totImages = numPatches*numImages;
+
+        int features = imageAllInOneSize/numPatches;
+
+        //res must be patches-number*rest
+        MatrixGpu res(numPatches*numImages, features);
+
+//#define STREAMS_ON
+
+#ifdef STREAMS_ON
+        // allocate and initialize an array of stream handles
+        int nstreams = 14;
+        cout << "async " << nstreams << endl;
+        cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
+        for(int i = 0; i < nstreams; i++)
+        {
+            cudaStreamCreate(&(streams[i]));
+        }
+        int indexForStream = 0;
+#endif //STREAMS_ON
+
+        res = -1.0;
+
+        cout << "patches:" << numPatches << endl;
+        cout << "features:" << features << endl;
+        cout << "images:" << numImages << endl;
+
+        for(int p = 0; p < numPatches; ++p)//p - patch number
+        {
+            for(int f = 0; f < features; ++f)//f - number of features (hidden layer)
+            {
+                        {
+#ifdef STREAMS_ON
+                            cudaMemcpyAsync
+#else //STREAMS_ON
+                            cudaMemcpy
+#endif //STREAMS_ON
+
+                                (res.getData() + (f*numPatches + p)*numImages //target
+                                     , getDataConst() + (f + p*features)*numImages //source
+                                     , sizeof(float)*numImages
+                                     , cudaMemcpyDeviceToDevice
+#ifdef STREAMS_ON
+                                     , streams[(++indexForStream) % nstreams]
+#endif //STREAMS_ON
+
+                                     );
+                            //goto breakit;
+                        }
+            }
+        }
+//breakit:
+
+#ifdef STREAMS_ON
+        // release resources
+        for(int i = 0; i < nstreams; i++)
+        {
+            cudaDeviceSynchronize();
+            cudaStreamDestroy(streams[i]);
+        }
+#endif //STREAMS_ON
+
+        return res;
     }
 }
 

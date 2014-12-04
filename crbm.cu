@@ -248,19 +248,24 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    if(argc > 7)
+    {
+        int device = atoi(argv[7]);
+        cout << "Device ID: " << device << endl;
+        cudaSetDevice(device);
+    }
+
     cublasStatus_t stat;
     cublasHandle_t handle;
 
+    cout << "cublas init ..." << flush;
     stat = cublasCreate(&handle);
     if (stat != CUBLAS_STATUS_SUCCESS) {
         printf ("CUBLAS initialization failed\n");
         return EXIT_FAILURE;
     }
+    cout << " done" << endl;
 
-    if(argc > 7)
-    {
-        cudaSetDevice(atoi(argv[7]));
-    }
     int hidden = atoi(argv[3]);
     float lSpeed = atof(argv[4]);
     float iterations = atof(argv[5]);
@@ -285,7 +290,7 @@ int main(int argc, char** argv)
         msgC("w", *xCpu);
     }
 
-#define TEST
+//#define TEST
 #ifdef TEST
     //image-size
     int im_x = 3;
@@ -451,7 +456,14 @@ int main(int argc, char** argv)
 
     y = Mult(x, w);
     //y = y.Sigmoid();
+    //msgG("y - raw", y);
+    //y.Reshape(xx.getX(), transX*transY*hidden);
     msgG("y", y);
+    Mat yyy = y.TransformToUpperLayer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX());
+    msgG("trans(y)", yyy);
+    Mat zzz = yyy.TransformFromUpperLayer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, xx.getX());
+    msgG("retranst(trans(y))", zzz);
+
     //y.Reshape(hidden*xx.getX(), transX*transY);
     //msgG("reshaped(y)", y);
     //MatrixCpu resy = y;
@@ -459,16 +471,11 @@ int main(int argc, char** argv)
 
     //exit(1);
     
-    Mat yy = y.T();
-    yy.MakeHardCopy();
-    msgG("transposed(y)", yy);
+    //Mat yy = y.T();
+    //yy.MakeHardCopy();
+    //msgG("transposed(y)", yy);
     //saveMatrix(resy, string(argv[1]) + ".transformRawTransposed");
-
     
-    MatrixCpu resy = y;
-    resy.Reshape(xx.getX(), transX*transY*hidden);
-    msgC("res(y)", resy);
-
     //saveMatrix(resy, string(argv[1]) + ".transform");
     exit(1);
     x2 = Mult(y, w.T());

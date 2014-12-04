@@ -74,7 +74,7 @@ void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTran
     msgC(filename.c_str(), inM);
 }
 
-void saveMatrix(YAMATH::MatrixCpu &inM, const std::string &filename)
+void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
 {
     std::cout << "saving [" << filename << "] ... " << std::endl;
     Timer t;
@@ -85,7 +85,7 @@ void saveMatrix(YAMATH::MatrixCpu &inM, const std::string &filename)
     msgC(filename.c_str(), inM);
 }
 
-void saveGpuMatrix(YAMATH::MatrixGpu &inM, const std::string &filename)
+void saveMatrix(const YAMATH::MatrixGpu &inM, const std::string &filename)
 {
     YAMATH::MatrixCpu resx = inM;
     saveMatrix(resx, filename);

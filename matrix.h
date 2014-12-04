@@ -276,7 +276,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             MatrixCpu(const MatrixGpu &inMatrix);
             MatrixCpu(const MatrixCpu &inMatrix);
 
-            bool Load(std::istream &inStream, bool inTransposed = false)
+            std::istream &Load(std::istream &inStream, bool inTransposed = false)
             {
 //column-first order - ld is leading dimension size - #rows
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
@@ -312,10 +312,10 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 }
 
 
-                return true;
+                return inStream;
             }
 
-            void Save(std::ostream &outStream) const
+            std::ostream &Save(std::ostream &outStream) const
             {
                 outStream << m_X << " " << m_Y << std::endl;
                 for(int i = 0; i < m_X; ++i)
@@ -342,6 +342,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                     outStream << std::endl;
                 }
 
+                return outStream;
             }
 
             ~MatrixCpu(void)

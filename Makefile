@@ -7,7 +7,7 @@ all: crbm rbm rbmCompute
 test: test.cu matrix.h
 	nvcc -o test -D CUDA test.cu -lcublas -lcurand -D DEBUG
 
-crbm: matrix.h crbm.o
+crbm: matrix.h crbm.h crbm.o
 	nvcc --gpu-architecture=sm_35 -o crbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbm.o -g
 
 rbm: rbm.o matrix.h rbm.cu

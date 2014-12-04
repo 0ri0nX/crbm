@@ -25,6 +25,8 @@ using namespace std;
 
 #include "matrix.h"
 
+#include "crbm.h"
+
 class Timer
 {
     public:
@@ -55,31 +57,6 @@ class Timer
 
 
 using namespace YAMATH;
-
-//class CRBMLayer
-//{
-//    //image-size
-//    int m_x = 200;
-//    int m_y = 200;
-//    int m_z = 3;
-//
-//    //convolution-size
-//    int m_cx = 10;
-//    int m_cy = 10;
-//
-//    //stride-size
-//    int m_stridex = 5;
-//    int m_stridey = 5;
-//
-//    MatrixGpu m_Weights;
-//
-//    int pn = convolutionPatchesNumber(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
-//    Mat x, xraw, y, x2, y2, dw1, dw2, err, lastW;
-//    x = xx.Convolve(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey);
-//
-//    Mat w(x.getY(), hidden); //init weights
-//
-//};
 
 void msgC(const char * inMsg, const MatrixCpu &x)
 {

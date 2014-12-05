@@ -65,23 +65,23 @@ void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM)
 
 void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false)
 {
-    std::cout << "loading [" << filename << "] ... " << std::endl;
+    std::cout << "loading [" << filename << "] ... " << std::flush;
     Timer t;
     ifstream f(filename.c_str());
     inM.Load(f, inTransposed);
     f.close();
-    t.tac("   ... done in ");
+    t.tac();
     //msgC(filename.c_str(), inM);
 }
 
 void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
 {
-    std::cout << "saving [" << filename << "] ... " << std::endl;
+    std::cout << "saving [" << filename << "] ... " << std::flush;
     Timer t;
     ofstream f(filename.c_str());
     inM.Save(f);
     f.close();
-    t.tac("   ... done in ");
+    t.tac();
     //msgC(filename.c_str(), inM);
 }
 

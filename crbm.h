@@ -13,7 +13,7 @@ class CRBMLayer
 {
     public:
 
-        CRBMLayer(void){}
+        CRBMLayer(void) : m_SignalStop(false) {}
         CRBMLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int hidden);
 
         float LearnAll(const YAMATH::MatrixGpu &inData, int batchSize = 256, int globalIterations = 1000, int batchIterations = 100);
@@ -43,6 +43,10 @@ class CRBMLayer
         void Save(const std::string &inName) const;
         void Load(const std::string &inName);
 
+        void SignalStop(void) const;
+        void ClearStop(void) const;
+        bool IsStopRequired(void) const;
+
     protected:
 
         float m_LearningSpeed; // = 0.001f
@@ -64,16 +68,34 @@ class CRBMLayer
 
         YAMATH::MatrixGpu m_Weights;
         YAMATH::MatrixGpu m_Normalizer;
+
+        mutable bool m_SignalStop;
 };
 
     CRBMLayer::CRBMLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int hidden)
         : m_LearningSpeed(0.001f), m_x(x), m_y(y), m_z(z), m_cx(cx), m_cy(cy)
           , m_stridex(stridex), m_stridey(stridey), m_hidden(hidden), m_Weights(cx*cy*z, hidden), m_Normalizer(1)
+          , m_SignalStop(false)
     {
         m_Weights.RandNormal(0.0f, 1.0f/(10.0*hidden));
         cout << "weight matrix randomized!" << endl;
     }
     
+    void CRBMLayer::SignalStop(void) const
+    {
+        m_SignalStop = true;
+    }
+
+    void CRBMLayer::ClearStop(void) const
+    {
+        m_SignalStop = false;
+    }
+
+    bool CRBMLayer::IsStopRequired(void) const
+    {
+        return m_SignalStop;
+    }
+
     //a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
     inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
     {
@@ -417,30 +439,47 @@ class CRBMLayer
     
         return rr.getDataConst()[0]/inInp.getX();
     }
-
-    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch, int batchIterations)
+    float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData, int batchSize, int globalIterations, int batchIterations)
     {
-        int LOG_MODULO = 10;
-        //Timer timer;
-
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
 
-        cout << "On image " << m_x << "x" << m_y << "x" << m_z << " applied convolution " << m_cx << "x" << m_cy << " with stride " << m_stridex << "x" << m_stridey << endl;
-        cout << "It resulted into " << transX << "x" << transY << " patches." << endl;
+        cout << "On image " << m_x << "x" << m_y << "x" << m_z << " applied convolution " << m_cx << "x" << m_cy << " with stride " << m_stridex << "x" << m_stridey
+             << " => " << transX << "x" << transY << " patches." << endl;
+
+        float error = -1;
+        for(int i = 1; i <= globalIterations && !IsStopRequired(); ++i)
+        {
+            Timer t;
+            cout << i << " / " << globalIterations << " sampling ... " << flush;
+            YAMATH::MatrixGpu batch = inData.Sample(batchSize);
+            t.tac();
+
+            error = LearnBatch(batch, batchIterations);
+        }
+
+        return error;
+    }
+
+    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch, int batchIterations)
+    {
+        int LOG_MODULO = 50;
+        Timer timer;
 
         YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, err, lastW;
 
         //timer.tic();
+        cout << "    Preparing data ... " << flush;
         Convolve(inBatch, x);
-        //timer.tac("Convolve: ");
+        timer.tac();
 
+        timer.tic();
         //lastW = m_Weights;
 
         bool ONE_ROW = true;
         float error = -1.0f;
 
-        for(int i = 1; i <= batchIterations; ++i)
+        for(int i = 1; i <= batchIterations && !IsStopRequired(); ++i)
         {
             y = Mult(x, m_Weights);
             FunctionHidden(y);
@@ -467,19 +506,22 @@ class CRBMLayer
             if(i % LOG_MODULO == 0 || i == batchIterations)
             {
                 error = computeError(x, x2);
-                cout << i << ": " << error << flush;
+                cout << "    " << i << " / " << batchIterations << ": " << error << flush;
 
-                if(ONE_ROW)
+                if(i != batchIterations)
                 {
-                    cout << "                  " << "\r" << flush;
-                }
-                else
-                {
-                    cout << endl;
+                    if(ONE_ROW)
+                    {
+                            cout << "                  " << "\r" << flush;
+                    }
+                    else
+                    {
+                        cout << endl;
+                    }
                 }
             }
         }
-        cout << endl;
+        timer.tac("     ");
 
         return error;
     }
@@ -606,6 +648,7 @@ class CRBMLayer
 
         sv(out, "weights", m_Weights);
     }
+
     void CRBMLayer::Load(std::istream &in)
     {
         lvc(in, "CRBMLayer", 1);
@@ -629,7 +672,7 @@ class CRBMLayer
 
     void CRBMLayer::Save(const std::string &inName) const
     {
-        std::cout << "Saving RBM layer [" << inName << "] ... " << std::flush;
+        std::cout << "saving [" << inName << "] ... " << std::flush;
         Timer t;
 
         ofstream f(inName.c_str());

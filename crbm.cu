@@ -6,6 +6,7 @@
 #include <cassert>
 #include <string>
 #include <time.h>
+#include <csignal>
 
 using namespace std;
 
@@ -14,6 +15,29 @@ using namespace std;
 #include "crbm.h"
 
 typedef MatrixGpu Mat;
+
+CRBM::CRBMLayer *abc = NULL;
+
+void signalHandler(int signum)
+{
+    if(abc != NULL)
+    {
+        cout << endl;
+        cout << "!!! Forcing RBM to interrupt learning ...            !!!" << endl;
+        cout << "!!! repeated CTRL+C will stop program without saving !!!" << endl;
+        cout << endl;
+
+        abc->SignalStop();
+
+        //clear handler
+        signal(SIGINT, SIG_DFL);
+    }
+    else
+    {
+        exit(signum);
+    }
+}
+
 
 int main(int argc, char** argv)
 {
@@ -47,15 +71,15 @@ int main(int argc, char** argv)
     float iterations = atof(argv[5]);
     int batchSize = atoi(argv[6]);
 
+    //register signal SIGINT and signal handler  
+    signal(SIGINT, signalHandler);
+
     MatrixCpu *xCpu = new MatrixCpu();
     loadMatrix(*xCpu, argv[1]);
     Mat xx = *xCpu;
 
     delete xCpu;
     xCpu = new MatrixCpu();
-
-
-    CRBM::CRBMLayer *abc = NULL;
 
     Timer timer;
     if(string(argv[2]) != "-")
@@ -98,19 +122,22 @@ int main(int argc, char** argv)
         abc = new CRBM::CRBMLayer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, hidden);
         abc->setLearningSpeed(lSpeed);
         timer.tac("done ");
-
     }
 
 
     timer.tic();
-    abc->LearnBatch(xx, iterations);
+    abc->LearnAll(xx, batchSize, iterations, 100);
     timer.tac("learning duration: ");
+
+    abc->Save(string(argv[1]) + ".rbm");
 
     Mat transformed;
     abc->Transform(xx, transformed);
-
     saveMatrix(transformed, string(argv[1]) + ".transformed");
-    abc->Save(string(argv[1]) + ".rbm");
+
+    Mat reconstructed;
+    abc->Transform(xx, reconstructed);
+    saveMatrix(reconstructed, string(argv[1]) + ".reconstructed");
 
     return 0;
 }

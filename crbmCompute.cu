@@ -65,6 +65,17 @@ int main(int argc, char** argv)
     }
 
     Mat y;
+    //msgG("xx", xx);
+    //layers[0]->Convolve(xx, y);
+    //saveMatrix(y, string(argv[3]) + ".conv");
+    //msgG("conv(xx)", y);
+    //layers[0]->DeConvolve(y, xx);
+    //saveMatrix(xx, string(argv[3]) + ".convDeconv");
+    //msgG("deconv(conv(xx))", xx);
+
+    //exit(1);
+
+
 
     for(int i = 0; i < layers.size(); ++i)
     {

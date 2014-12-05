@@ -113,15 +113,15 @@ int main(int argc, char** argv)
         cout << "\rsave will be started now! " << endl;
     }
 
-    abc->Save(string(argv[1]) + ".rbm");
+    abc->Save(string(argv[3]) + ".rbm");
 
     Mat transformed;
     abc->Transform(xx, transformed);
-    saveMatrix(transformed, string(argv[1]) + ".transformed");
+    saveMatrix(transformed, string(argv[3]) + ".transformed");
 
     Mat reconstructed;
-    abc->Transform(xx, reconstructed);
-    saveMatrix(reconstructed, string(argv[1]) + ".reconstructed");
+    abc->Reconstruct(transformed, reconstructed);
+    saveMatrix(reconstructed, string(argv[3]) + ".reconstructed");
 
     return 0;
 }

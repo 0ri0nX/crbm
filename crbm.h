@@ -297,6 +297,7 @@ namespace CRBM
         }
 
         m_Normalizer.Reset(numImages , s().x*s().y*s().z);
+        m_Normalizer = 0.0f;
 
         //horizontal and vertical number of patches
         int nh, nv;
@@ -331,14 +332,15 @@ namespace CRBM
 
     void CRBMLayer::DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch)
     {
+        msgG("inBatch:", inBatch);
         DeConvolveRaw(inBatch, outBatch);
-
-        //msgG("inBatch:", inBatch);
-        //msgG("normalizer:", m_Normalizer);
+        msgG("outBatch (nonnormalized):", outBatch);
 
         SetDeConvolveNormalizer(outBatch.getX());
+        msgG("normalizer:", m_Normalizer);
 
         outBatch = outBatch*m_Normalizer;
+        msgG("outBatch (normalized):", outBatch);
     }
 
     void CRBMLayer::DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
@@ -357,8 +359,8 @@ namespace CRBM
 
         int totImages = numPatches*numImages;
 
-        //TODO: remove
-        //outBatch = 0.0;
+        //initial reset to zero
+        outBatch = 0.0;
 
         static int ThreadsPerBlock = 512;
         int blocks = (numImages - 1) / ThreadsPerBlock + 1;

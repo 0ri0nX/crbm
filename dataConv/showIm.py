@@ -24,12 +24,17 @@ for j in f:
     r = list(np.array(r).astype(int))
     
     d = zip(r[0::3], r[1::3], r[2::3])
-    
-    ii = im.new("RGB", size = size)
-    
-    ii.putdata(d)
-    
-    ii = ii.resize((size[0]*5, size[0]*5))
 
-    ii.show()
+    try:
+    
+        ii = im.new("RGB", size = size)
+    
+        ii.putdata(d)
+
+        if size[0] < 50:
+            ii = ii.resize((size[0]*5, size[0]*5))
+
+        ii.show()
+    except:
+        print "bad"
 

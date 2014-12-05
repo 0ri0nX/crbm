@@ -871,6 +871,10 @@ int MatrixGpu::m_Allocations = 0;
             OperationMatrixElementwiseBinary(const MatrixGpu& inA, const MatrixGpu& inB, EFunctionElementwiseBinary inType)
                 : m_A(inA), m_B(inB), m_Type(inType)
             {
+                if(inA.getX() != inB.getX() || inA.getY() != inB.getY())
+                {
+                    cout << "wanted: " << inA.getX() << "x" << inA.getY() << ", got " << inB.getX() << "x" << inB.getY() << endl;
+                }
                 assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
                 assert (inA.isTrans() == inB.isTrans());
             }

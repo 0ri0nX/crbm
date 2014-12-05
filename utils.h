@@ -47,11 +47,11 @@ void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)
     }
     else if(n == 1)
     {
-        std::cout  << inMsg << ":[" << x.getDataConst()[0] << "]" << flush;
+        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":[" << x.getDataConst()[0] << "]" << flush;
     }
     else
     {
-        std::cout  << inMsg << ":" << std::endl;
+        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":" << std::endl;
         x.Save(std::cout);
         std::cout << std::endl;
     }

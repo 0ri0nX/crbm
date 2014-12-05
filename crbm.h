@@ -5,80 +5,182 @@
 #include "utils.h"
 #include <stdexcept>
 #include <sstream>
+#include "setting.h"
 
 namespace CRBM
 {
 
-class CRBMLayer
-{
-    public:
-
-        CRBMLayer(void) : m_SignalStop(false) {}
-        CRBMLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int hidden);
-
-        float LearnAll(const YAMATH::MatrixGpu &inData, int batchSize = 256, int globalIterations = 1000, int batchIterations = 100);
-        float LearnBatch(const YAMATH::MatrixGpu &inBatch, int batchIterations = 100);
-        void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
-        void Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
-        void setLearningSpeed(float inLearningSpeed = 0.001f);
-
-        //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
-        //it is expected that matrix has m.x==x and m.y == y*z
-        void Convolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
-        void DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch);
-        void DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
-        void SetDeConvolveNormalizer(int numImages);
-        void getConvolutionPatchesNumber(int &outX, int &outY) const;
-
-        //all parameters are from this layer
-        void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
-        //all parameters are from this layer as well
-        void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
-
-        static void FunctionHidden(YAMATH::MatrixGpu &inHidden);
-        static void FunctionVisible(YAMATH::MatrixGpu &inVisible);
-
-        void Save(std::ostream &outStream) const;
-        void Load(std::istream &inStream);
-        void Save(const std::string &inName) const;
-        void Load(const std::string &inName);
-
-        void SignalStop(void) const;
-        void ClearStop(void) const;
-        bool IsStopRequired(void) const;
-
-    protected:
-
-        float m_LearningSpeed; // = 0.001f
-
-        //image-size
-        int m_x;// = 200;
-        int m_y;// = 200;
-        int m_z;// = 3;
-
-        //convolution-size
-        int m_cx;// = 10;
-        int m_cy;// = 10;
-
-        //stride-size
-        int m_stridex;// = 5;
-        int m_stridey;// = 5;
-
-        int m_hidden;// = 15
-
-        YAMATH::MatrixGpu m_Weights;
-        YAMATH::MatrixGpu m_Normalizer;
-
-        mutable bool m_SignalStop;
-};
-
-    CRBMLayer::CRBMLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int hidden)
-        : m_LearningSpeed(0.001f), m_x(x), m_y(y), m_z(z), m_cx(cx), m_cy(cy)
-          , m_stridex(stridex), m_stridey(stridey), m_hidden(hidden), m_Weights(cx*cy*z, hidden), m_Normalizer(1)
-          , m_SignalStop(false)
+    struct CRBMLayerSetting : SettingBase
     {
-        m_Weights.RandNormal(0.0f, 1.0f/(10.0*hidden));
+        CRBMLayerSetting()
+        {
+            x = 200;
+            y = 200;
+            z = 3;
+    
+            cx = 10;
+            cy = 10;
+    
+            stridex = 5;
+            stridey = 5;
+    
+            hidden = 15;
+    
+            batchSize = 100;
+            batchIterations = 100;
+            iterations = 1000;
+    
+            learningRate = 0.001f;
+    
+            saveInterval = 10;
+    
+            //momentum = 0.9f;
+            //dataLimit = 0;
+            //binarySampling = 0;
+            //testBatchModulo = 1;
+            //AFUp = AFSigmoid;
+            //AFDown = AFSigmoid;
+            //computeOnly = 0;
+            //saveBestModel = 0;
+            //testFile = "";
+            //l2 = 0.0001;
+            //dataType = 0; //0 - sparse: id qid:qid 1:0.12 ... , //1 - images: id qid:qid 'path-to-image'
+            //imgType = 0; //0 color, 1 grey, 2 edge
+        }
+    
+        virtual void loadFromStream(ifstream &f)
+        {
+            x               = loadOption(f, "x",                           x);
+            y               = loadOption(f, "y",                           y);
+            z               = loadOption(f, "z",                           z);
+            cx              = loadOption(f, "cx",                          cx);
+            cy              = loadOption(f, "cy",                          cy);
+            stridex         = loadOption(f, "stridex",                     stridex);
+            stridey         = loadOption(f, "stridey",                     stridey);
+            hidden          = loadOption(f, "hidden",                      hidden);
+            batchSize       = loadOption(f, "batchSize",                   batchSize);
+            batchIterations = loadOption(f, "batchIterations",             batchIterations);
+            iterations      = loadOption(f, "iterations",                  iterations);
+            learningRate    = loadOption(f, "learningRate",                learningRate);
+            saveInterval    = loadOption(f, "saveInterval",                saveInterval);
+        }
+    
+        //image-size
+        int x;
+        int y;
+        int z;
+    
+        //convolution-size
+        int cx;
+        int cy;
+    
+        //stride-size
+        int stridex;
+        int stridey;
+    
+        int hidden;
+    
+        int batchSize;
+        int batchIterations;
+        int iterations;
+        float learningRate;
+    
+        int saveInterval;
+    };
+
+
+    class CRBMLayer
+    {
+        public:
+    
+            CRBMLayer(void) : m_SignalStop(false) {}
+            CRBMLayer(const CRBMLayerSetting &inSetting);
+
+            //weights are reseted only when topology changes or forced by forceResetWeights flag
+            void ResetSetting(const CRBMLayerSetting &inSetting, bool forceResetWeights = false);
+    
+            float LearnAll(const YAMATH::MatrixGpu &inData);
+            float LearnBatch(const YAMATH::MatrixGpu &inBatch);
+            void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
+            void Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
+    
+            //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
+            //it is expected that matrix has m.x==x and m.y == y*z
+            void Convolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
+            void DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch);
+            void DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
+            void SetDeConvolveNormalizer(int numImages);
+            void getConvolutionPatchesNumber(int &outX, int &outY) const;
+    
+            //all parameters are from this layer
+            void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
+            //all parameters are from this layer as well
+            void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
+    
+            static void FunctionHidden(YAMATH::MatrixGpu &inHidden);
+            static void FunctionVisible(YAMATH::MatrixGpu &inVisible);
+    
+            void Save(std::ostream &outStream) const;
+            void Load(std::istream &inStream);
+            void Save(const std::string &inName) const;
+            void Load(const std::string &inName);
+    
+            void SignalStop(void) const;
+            void ClearStop(void) const;
+            bool IsStopRequired(void) const;
+
+            void ResetWeights(void);
+    
+        protected:
+    
+            //returns setting - for convenience
+            const CRBMLayerSetting& s(void) const;
+    
+            CRBMLayerSetting m_Setting;
+    
+            YAMATH::MatrixGpu m_Weights;
+            YAMATH::MatrixGpu m_Normalizer;
+    
+            mutable bool m_SignalStop;
+    };
+
+    CRBMLayer::CRBMLayer(const CRBMLayerSetting &inSetting) :
+        m_Setting(inSetting)
+        , m_SignalStop(false)
+    {
+        ResetWeights();
+    }
+
+    void CRBMLayer::ResetSetting(const CRBMLayerSetting &inSetting, bool forceResetWeights)
+    {
+        bool reset = forceResetWeights
+            || s().x != inSetting.x
+            || s().y != inSetting.y
+            || s().z != inSetting.z
+            || s().cx != inSetting.cx
+            || s().cy != inSetting.cy
+            || s().stridex != inSetting.stridex
+            || s().stridey != inSetting.stridey
+            || s().hidden != inSetting.hidden;
+
+        m_Setting = inSetting;
+
+        if(reset)
+        {
+            ResetWeights();
+        }
+    }
+
+    void CRBMLayer::ResetWeights(void)
+    {
+        m_Weights.Reset(s().cx*s().cy*s().z, s().hidden);
+        m_Weights.RandNormal(0.0f, 1.0f/(10.0*s().hidden));
         cout << "weight matrix randomized!" << endl;
+    }
+
+    const CRBMLayerSetting& CRBMLayer::s(void) const
+    {
+        return m_Setting;
     }
     
     void CRBMLayer::SignalStop(void) const
@@ -106,15 +208,15 @@ class CRBMLayer
     
     void CRBMLayer::getConvolutionPatchesNumber(int &outX, int &outY) const
     {
-        outX = (m_x-m_cx)/m_stridex+1;
-        outY = (m_y-m_cy)/m_stridey+1;
+        outX = (s().x-s().cx)/s().stridex+1;
+        outY = (s().y-s().cy)/s().stridey+1;
     }
 
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
     //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
     void CRBMLayer::Convolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
-        assert(inBatch.getY() == m_x*m_y*m_z);
+        assert(inBatch.getY() == s().x*s().y*s().z);
 
         //horizontal and vertical number of patches
         int nh, nv;
@@ -124,7 +226,7 @@ class CRBMLayer
         int numPatches = nh*nv;
         int totImages = numPatches*numImages;
 
-        outBatch.Reset(totImages , m_cx*m_cy*m_z);
+        outBatch.Reset(totImages , s().cx*s().cy*s().z);
 
 //#define STREAMS_ON
 
@@ -141,17 +243,17 @@ class CRBMLayer
 #endif //STREAMS_ON
 
         //TODO: remove, only for tesst
-        outBatch = -1.0;
+        //outBatch = -1.0;
 
         for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
         {
             for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
             {
-                for(int ay = 0; ay < m_cy; ++ay)//y in convolution window
+                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window
                 {
-                    for(int ax = 0; ax < m_cx; ++ax)//x in convolution window
+                    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window
                     {
-                        for(int az = 0; az < m_z; ++az)//image layers
+                        for(int az = 0; az < s().z; ++az)//image layers
                         {
 #ifdef STREAMS_ON
                             cudaMemcpyAsync
@@ -159,8 +261,8 @@ class CRBMLayer
                             cudaMemcpy
 #endif //STREAMS_ON
 
-                                (outBatch.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, m_cx, m_cy, m_z, totImages) //convolution window target
-                                     , inBatch.getDataConst() + pixelInColMajor(m_stridex*px + ax, m_stridey*py + ay, az, 0, m_x, m_y, m_z, numImages) //convolution window source
+                                (outBatch.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, s().cx, s().cy, s().z, totImages) //convolution window target
+                                     , inBatch.getDataConst() + pixelInColMajor(s().stridex*px + ax, s().stridey*py + ay, az, 0, s().x, s().y, s().z, numImages) //convolution window source
                                      , sizeof(float)*numImages
                                      , cudaMemcpyDeviceToDevice
 #ifdef STREAMS_ON
@@ -189,12 +291,12 @@ class CRBMLayer
     void CRBMLayer::SetDeConvolveNormalizer(int numImages)
     {
         //is already propetly set
-        if(m_Normalizer.getX() == numImages && m_Normalizer.getY() == m_x*m_y*m_z)
+        if(m_Normalizer.getX() == numImages && m_Normalizer.getY() == s().x*s().y*s().z)
         {
             return;
         }
 
-        m_Normalizer.Reset(numImages , m_x*m_y*m_z);
+        m_Normalizer.Reset(numImages , s().x*s().y*s().z);
 
         //horizontal and vertical number of patches
         int nh, nv;
@@ -207,14 +309,14 @@ class CRBMLayer
         {
             for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
             {
-                for(int ay = 0; ay < m_cy; ++ay)//y in convolution window
+                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window
                 {
-                    for(int ax = 0; ax < m_cx; ++ax)//x in convolution window
+                    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window
                     {
-                        for(int az = 0; az < m_z; ++az)//image layers
+                        for(int az = 0; az < s().z; ++az)//image layers
                         {
                             //float *dFrom = getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages); //convolution window target
-                            float *dTo = m_Normalizer.getData()  + pixelInColMajor(m_stridex*px + ax, m_stridey*py + ay, az, 0, m_x, m_y, m_z, numImages); //convolution window source
+                            float *dTo = m_Normalizer.getData()  + pixelInColMajor(s().stridex*px + ax, s().stridey*py + ay, az, 0, s().x, s().y, s().z, numImages); //convolution window source
                             YAMATH::applyFunction<<<blocks, ThreadsPerBlock>>>(dTo, dTo, numImages, YAMATH::EFE_PlusScalar, 1.0f);
                         }
                     }
@@ -231,8 +333,10 @@ class CRBMLayer
     {
         DeConvolveRaw(inBatch, outBatch);
 
-        cout << outBatch.getX() << " x " << outBatch.getY() << endl;
-        cout << m_Normalizer.getX() << " x " << m_Normalizer.getY() << endl;
+        //msgG("inBatch:", inBatch);
+        //msgG("normalizer:", m_Normalizer);
+
+        SetDeConvolveNormalizer(outBatch.getX());
 
         outBatch = outBatch*m_Normalizer;
     }
@@ -245,16 +349,16 @@ class CRBMLayer
 
         int numImages = inBatch.getX() / (nh*nv);
 
-        assert(inBatch.getY() == m_cx*m_cy*m_z);
+        assert(inBatch.getY() == s().cx*s().cy*s().z);
 
-        outBatch.Reset(numImages , m_x*m_y*m_z);
+        outBatch.Reset(numImages , s().x*s().y*s().z);
 
         int numPatches = nh*nv;
 
         int totImages = numPatches*numImages;
 
         //TODO: remove
-        outBatch = 0.0;
+        //outBatch = 0.0;
 
         static int ThreadsPerBlock = 512;
         int blocks = (numImages - 1) / ThreadsPerBlock + 1;
@@ -263,14 +367,14 @@ class CRBMLayer
         {
             for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
             {
-                for(int ay = 0; ay < m_cy; ++ay)//y in convolution window
+                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window
                 {
-                    for(int ax = 0; ax < m_cx; ++ax)//x in convolution window
+                    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window
                     {
-                        for(int az = 0; az < m_z; ++az)//image layers
+                        for(int az = 0; az < s().z; ++az)//image layers
                         {
-                            float *dFrom = inBatch.getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, m_cx, m_cy, m_z, totImages); //convolution window target
-                            float *dTo = outBatch.getData()  + pixelInColMajor(m_stridex*px + ax, m_stridey*py + ay, az, 0, m_x, m_y, m_z, numImages); //convolution window source
+                            float *dFrom = inBatch.getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, s().cx, s().cy, s().z, totImages); //convolution window target
+                            float *dTo = outBatch.getData()  + pixelInColMajor(s().stridex*px + ax, s().stridey*py + ay, az, 0, s().x, s().y, s().z, numImages); //convolution window source
                             YAMATH::parallelMatrixOperationBinary<<<blocks, ThreadsPerBlock>>>(dTo, dFrom, numImages, YAMATH::EFEB_Plus, dTo);
                         }
                     }
@@ -286,11 +390,11 @@ class CRBMLayer
         int nh, nv;
         getConvolutionPatchesNumber(nh, nv);
 
-        int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*m_hidden);
+        int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*s().hidden);
         //msgG("inBatch: ", inBatch);
         //cout << "nh" << nh << endl;
         //cout << "nv" << nv << endl;
-        //cout << "m_hidden" << m_hidden << endl;
+        //cout << "s().hidden" << s().hidden << endl;
         //cout << "Num images" << numImages << endl;
 
         int numPatches = nh*nv;
@@ -362,13 +466,13 @@ class CRBMLayer
         int nh, nv;
         getConvolutionPatchesNumber(nh, nv);
 
-        int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*m_hidden);
+        int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*s().hidden);
 
         int numPatches = nh*nv;
         int total = inBatch.getX()*inBatch.getY();
 
         //res must be patches-number*rest ?
-        outBatch.Reset(numPatches*numImages, m_hidden);
+        outBatch.Reset(numPatches*numImages, s().hidden);
 
 //#define STREAMS_ON
 
@@ -385,15 +489,15 @@ class CRBMLayer
 #endif //STREAMS_ON
 
         //TODO: remove
-        outBatch = -1.0;
+        //outBatch = -1.0;
 
-        cout << "patches:" << numPatches << endl;
-        cout << "features:" << m_hidden << endl;
-        cout << "images:" << numImages << endl;
+        //cout << "patches:" << numPatches << endl;
+        //cout << "features:" << s().hidden << endl;
+        //cout << "images:" << numImages << endl;
 
         for(int p = 0; p < numPatches; ++p)//p - patch number
         {
-            for(int f = 0; f < m_hidden; ++f)//f - number of features (hidden layer)
+            for(int f = 0; f < s().hidden; ++f)//f - number of features (hidden layer)
             {
                         {
 #ifdef STREAMS_ON
@@ -403,7 +507,7 @@ class CRBMLayer
 #endif //STREAMS_ON
 
                                 (outBatch.getData() + (f*numPatches + p)*numImages //target
-                                     , inBatch.getDataConst() + (f + p*m_hidden)*numImages //source
+                                     , inBatch.getDataConst() + (f + p*s().hidden)*numImages //source
                                      , sizeof(float)*numImages
                                      , cudaMemcpyDeviceToDevice
 #ifdef STREAMS_ON
@@ -439,39 +543,42 @@ class CRBMLayer
     
         return rr.getDataConst()[0]/inInp.getX();
     }
-    float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData, int batchSize, int globalIterations, int batchIterations)
+    float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData)
     {
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
 
-        cout << "On image " << m_x << "x" << m_y << "x" << m_z << " applied convolution " << m_cx << "x" << m_cy << " with stride " << m_stridex << "x" << m_stridey
+        cout << "On image " << s().x << "x" << s().y << "x" << s().z << " applied convolution " << s().cx << "x" << s().cy << " with stride " << s().stridex << "x" << s().stridey
              << " => " << transX << "x" << transY << " patches." << endl;
 
         float error = -1;
-        for(int i = 1; i <= globalIterations && !IsStopRequired(); ++i)
+        for(int i = 1; i <= s().iterations && !IsStopRequired(); ++i)
         {
             Timer t;
-            cout << i << " / " << globalIterations << " sampling ... " << flush;
-            YAMATH::MatrixGpu batch = inData.Sample(batchSize);
+            cout << i << " / " << s().iterations << " sampling ... " << flush;
+            YAMATH::MatrixGpu batch = inData.Sample(s().batchSize);
             t.tac();
 
-            error = LearnBatch(batch, batchIterations);
+            error = LearnBatch(batch);
         }
 
         return error;
     }
 
-    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch, int batchIterations)
+    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch)
     {
         int LOG_MODULO = 50;
         Timer timer;
 
-        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, err, lastW;
+        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, lastW;
 
         //timer.tic();
         cout << "    Preparing data ... " << flush;
         Convolve(inBatch, x);
         timer.tac();
+
+        //msgG("x", x);
+        //msgG("w", m_Weights);
 
         timer.tic();
         //lastW = m_Weights;
@@ -479,7 +586,7 @@ class CRBMLayer
         bool ONE_ROW = true;
         float error = -1.0f;
 
-        for(int i = 1; i <= batchIterations && !IsStopRequired(); ++i)
+        for(int i = 1; i <= s().batchIterations && !IsStopRequired(); ++i)
         {
             y = Mult(x, m_Weights);
             FunctionHidden(y);
@@ -493,8 +600,8 @@ class CRBMLayer
             dw1 = Mult(x.T(), y);
             dw2 = Mult(x2.T(), y2);
 
-            dw1 *= (m_LearningSpeed/x.getX());
-            dw2 *= (m_LearningSpeed/x.getX());
+            dw1 *= (s().learningRate/x.getX());
+            dw2 *= (s().learningRate/x.getX());
 
             m_Weights = m_Weights + dw1;
             m_Weights = m_Weights - dw2;
@@ -503,12 +610,12 @@ class CRBMLayer
             //w = w - lastW;
             //lastW = w;
 
-            if(i % LOG_MODULO == 0 || i == batchIterations)
+            if(i % LOG_MODULO == 0 || i == s().batchIterations)
             {
                 error = computeError(x, x2);
-                cout << "    " << i << " / " << batchIterations << ": " << error << flush;
+                cout << "    " << i << " / " << s().batchIterations << ": " << error << flush;
 
-                if(i != batchIterations)
+                if(i != s().batchIterations)
                 {
                     if(ONE_ROW)
                     {
@@ -551,17 +658,18 @@ class CRBMLayer
     {
         YAMATH::MatrixGpu x, y;
 
+        //msgG("inData", inData);
+
         UpperLayer2RawOutput(inData, y);
+
+        //msgG("y", inData);
 
         x = Mult(y, m_Weights.T());
         FunctionVisible(x);
 
-        DeConvolve(x, outData);
-    }
+        //msgG("x", x);
 
-    void CRBMLayer::setLearningSpeed(float inLearningSpeed)
-    {
-        m_LearningSpeed = inLearningSpeed;
+        DeConvolve(x, outData);
     }
 
     template<typename T>
@@ -632,19 +740,19 @@ class CRBMLayer
     {
         sv(out, "CRBMLayer", 1);
 
-        sv(out, "learningSpeed", m_LearningSpeed);
+        sv(out, "learningSpeed", s().learningRate);
 
-        sv(out, "x", m_x);
-        sv(out, "y", m_y);
-        sv(out, "z", m_z);
+        sv(out, "x", s().x);
+        sv(out, "y", s().y);
+        sv(out, "z", s().z);
 
-        sv(out, "cx", m_cx);
-        sv(out, "cy", m_cy);
+        sv(out, "cx", s().cx);
+        sv(out, "cy", s().cy);
 
-        sv(out, "stridex", m_stridex);
-        sv(out, "stridey", m_stridey);
+        sv(out, "stridex", s().stridex);
+        sv(out, "stridey", s().stridey);
 
-        sv(out, "hidden", m_hidden);
+        sv(out, "hidden", s().hidden);
 
         sv(out, "weights", m_Weights);
     }
@@ -653,19 +761,19 @@ class CRBMLayer
     {
         lvc(in, "CRBMLayer", 1);
 
-        lv(in, "learningSpeed", m_LearningSpeed);
+        lv(in, "learningSpeed", m_Setting.learningRate);
 
-        lv(in, "x", m_x);
-        lv(in, "y", m_y);
-        lv(in, "z", m_z);
+        lv(in, "x", m_Setting.x);
+        lv(in, "y", m_Setting.y);
+        lv(in, "z", m_Setting.z);
 
-        lv(in, "cx", m_cx);
-        lv(in, "cy", m_cy);
+        lv(in, "cx", m_Setting.cx);
+        lv(in, "cy", m_Setting.cy);
 
-        lv(in, "stridex", m_stridex);
-        lv(in, "stridey", m_stridey);
+        lv(in, "stridex", m_Setting.stridex);
+        lv(in, "stridey", m_Setting.stridey);
 
-        lv(in, "hidden", m_hidden);
+        lv(in, "hidden", m_Setting.hidden);
 
         lv(in, "weights", m_Weights);
     }

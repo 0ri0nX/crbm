@@ -41,16 +41,17 @@ void signalHandler(int signum)
 
 int main(int argc, char** argv)
 {
-    if(argc != 7 && argc != 8)
+    if(argc != 4 && argc != 5)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " input-vector-file input-weight-file hidden-size learning-speed iter batch [cudadevice-id]" << endl;
+        cout << argv[0] << " setting-file model-file input-vector-file [cudadevice-id]" << endl;
+        cout << "\tmodel-file can be \"-\" for random-model initialization." << endl;
         exit(1);
     }
 
-    if(argc > 7)
+    if(argc > 4)
     {
-        int device = atoi(argv[7]);
+        int device = atoi(argv[4]);
         cout << "Device ID: " << device << endl;
         cudaSetDevice(device);
     }
@@ -66,68 +67,51 @@ int main(int argc, char** argv)
     }
     cout << " done" << endl;
 
-    int hidden = atoi(argv[3]);
-    float lSpeed = atof(argv[4]);
-    float iterations = atof(argv[5]);
-    int batchSize = atoi(argv[6]);
+    CRBM::CRBMLayerSetting setting;
+    setting.loadFromFile(argv[1]);
 
     //register signal SIGINT and signal handler  
     signal(SIGINT, signalHandler);
 
+    Timer timer;
+    if(string(argv[2]) != "-")
+    {
+        cout << "Loading RBM-layer ... " << flush;
+        abc = new CRBM::CRBMLayer(setting);
+        abc->Load(string(argv[2]));
+
+        //reset loaded setting
+        abc->ResetSetting(setting);
+    }
+    else
+    {
+        cout << "Creating RBM-layer ... " << flush;
+        abc = new CRBM::CRBMLayer(setting);
+        timer.tac("  ... done in ");
+    }
+
     MatrixCpu *xCpu = new MatrixCpu();
-    loadMatrix(*xCpu, argv[1]);
+    loadMatrix(*xCpu, argv[3]);
     Mat xx = *xCpu;
 
     delete xCpu;
     xCpu = new MatrixCpu();
 
-    Timer timer;
-    if(string(argv[2]) != "-")
-    {
-        abc = new CRBM::CRBMLayer();
-        abc->Load(string(argv[2]));
-    }
-    else
-    {
-//#define TEST
-#ifdef TEST
-        //image-size
-        int im_x = 3;
-        int im_y = 4;
-        int im_z = 2;
-    
-        //convolution-size
-        int im_cx = 2;
-        int im_cy = 2;
-    
-        //stride-size
-        int im_stridex = 1;
-        int im_stridey = 1;
-#else
-        //image-size
-        int im_x = 200;
-        int im_y = 200;
-        int im_z = 3;
-    
-        //convolution-size
-        int im_cx = 10;
-        int im_cy = 10;
-    
-        //stride-size
-        int im_stridex = 5;
-        int im_stridey = 5;
-#endif
-
-        cout << "Creating RBM-layer ... " << flush;
-        abc = new CRBM::CRBMLayer(im_x, im_y, im_z, im_cx, im_cy, im_stridex, im_stridey, hidden);
-        abc->setLearningSpeed(lSpeed);
-        timer.tac("done ");
-    }
-
 
     timer.tic();
-    abc->LearnAll(xx, batchSize, iterations, 100);
+    abc->LearnAll(xx);
     timer.tac("learning duration: ");
+
+    if(abc->IsStopRequired())
+    {
+        cout << endl;
+        for(int i = 3; i > 0; --i)
+        {
+            cout << "\rsave will be started in " << i << flush;
+            sleep(1);
+        }
+        cout << "\rsave will be started now! " << endl;
+    }
 
     abc->Save(string(argv[1]) + ".rbm");
 

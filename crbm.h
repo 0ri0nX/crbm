@@ -332,15 +332,15 @@ namespace CRBM
 
     void CRBMLayer::DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch)
     {
-        msgG("inBatch:", inBatch);
+        //msgG("inBatch:", inBatch);
         DeConvolveRaw(inBatch, outBatch);
-        msgG("outBatch (nonnormalized):", outBatch);
+        //msgG("outBatch (nonnormalized):", outBatch);
 
         SetDeConvolveNormalizer(outBatch.getX());
-        msgG("normalizer:", m_Normalizer);
+        //msgG("normalizer:", m_Normalizer);
 
         outBatch = outBatch*m_Normalizer;
-        msgG("outBatch (normalized):", outBatch);
+        //msgG("outBatch (normalized):", outBatch);
     }
 
     void CRBMLayer::DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
@@ -612,7 +612,7 @@ namespace CRBM
             //w = w - lastW;
             //lastW = w;
 
-            if(i % LOG_MODULO == 0 || i == s().batchIterations)
+            if(i % LOG_MODULO == 0 || i == s().batchIterations || i == 1)
             {
                 error = computeError(x, x2);
                 cout << "    " << i << " / " << s().batchIterations << ": " << error << flush;

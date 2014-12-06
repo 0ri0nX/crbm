@@ -27,6 +27,7 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    cudaSetDevice(atoi(argv[1]));
     cublasStatus_t stat;
     cublasHandle_t handle;
 
@@ -36,7 +37,6 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    cudaSetDevice(atoi(argv[1]));
     string computationType = argv[2];
     if(computationType != "reconstruct" && computationType != "transform")
     {

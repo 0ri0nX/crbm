@@ -186,13 +186,13 @@ int main(int argc, char** argv)
     cublasStatus_t stat;
     cublasHandle_t handle;
 
+    cudaSetDevice(atoi(argv[1]));
     stat = cublasCreate(&handle);
     if (stat != CUBLAS_STATUS_SUCCESS) {
         printf ("CUBLAS initialization failed\n");
         return EXIT_FAILURE;
     }
 
-    cudaSetDevice(atoi(argv[1]));
     string computationType = argv[2];
     if(computationType != "reconstruct" && computationType != "transform")
     {

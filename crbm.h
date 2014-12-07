@@ -32,7 +32,12 @@ namespace CRBM
     
             learningRate = 0.001f;
     
+            logModulo = 50;
+
             saveInterval = 10;
+
+            activationFunctionH = 0;
+            activationFunctionV = 0;
     
             //momentum = 0.9f;
             //dataLimit = 0;
@@ -50,19 +55,22 @@ namespace CRBM
     
         virtual void loadFromStream(ifstream &f)
         {
-            x               = loadOption(f, "x",                           x);
-            y               = loadOption(f, "y",                           y);
-            z               = loadOption(f, "z",                           z);
-            cx              = loadOption(f, "cx",                          cx);
-            cy              = loadOption(f, "cy",                          cy);
-            stridex         = loadOption(f, "stridex",                     stridex);
-            stridey         = loadOption(f, "stridey",                     stridey);
-            hidden          = loadOption(f, "hidden",                      hidden);
-            batchSize       = loadOption(f, "batchSize",                   batchSize);
-            batchIterations = loadOption(f, "batchIterations",             batchIterations);
-            iterations      = loadOption(f, "iterations",                  iterations);
-            learningRate    = loadOption(f, "learningRate",                learningRate);
-            saveInterval    = loadOption(f, "saveInterval",                saveInterval);
+            x               = loadOption(f, "x",                            x);
+            y               = loadOption(f, "y",                            y);
+            z               = loadOption(f, "z",                            z);
+            cx              = loadOption(f, "cx",                           cx);
+            cy              = loadOption(f, "cy",                           cy);
+            stridex         = loadOption(f, "stridex",                      stridex);
+            stridey         = loadOption(f, "stridey",                      stridey);
+            hidden          = loadOption(f, "hidden",                       hidden);
+            batchSize       = loadOption(f, "batchSize",                    batchSize);
+            batchIterations = loadOption(f, "batchIterations",              batchIterations);
+            iterations      = loadOption(f, "iterations",                   iterations);
+            learningRate    = loadOption(f, "learningRate",                 learningRate);
+            logModulo       = loadOption(f, "logModulo",                    logModulo);
+            saveInterval    = loadOption(f, "saveInterval",                 saveInterval);
+            activationFunctionH               = loadOption(f, "activationFunctionH",                            activationFunctionH);
+            activationFunctionV               = loadOption(f, "activationFunctionV",                            activationFunctionV);
         }
     
         //image-size
@@ -84,7 +92,11 @@ namespace CRBM
         int batchIterations;
         int iterations;
         float learningRate;
-    
+
+        int activationFunctionH;
+        int activationFunctionV;
+   
+        int logModulo;
         int saveInterval;
     };
 
@@ -117,8 +129,8 @@ namespace CRBM
             //all parameters are from this layer as well
             void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
     
-            static void FunctionHidden(YAMATH::MatrixGpu &inHidden);
-            static void FunctionVisible(YAMATH::MatrixGpu &inVisible);
+            void FunctionHidden(YAMATH::MatrixGpu &inHidden) const;
+            void FunctionVisible(YAMATH::MatrixGpu &inVisible) const;
     
             void Save(std::ostream &outStream) const;
             void Load(std::istream &inStream);
@@ -569,7 +581,6 @@ namespace CRBM
 
     float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch)
     {
-        int LOG_MODULO = 50;
         Timer timer;
 
         YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, lastW;
@@ -585,8 +596,8 @@ namespace CRBM
         timer.tic();
         //lastW = m_Weights;
 
-        bool ONE_ROW = true;
         float error = -1.0f;
+        cout << "    " << s().batchIterations << " iterations:" << flush;
 
         for(int i = 1; i <= s().batchIterations && !IsStopRequired(); ++i)
         {
@@ -612,36 +623,48 @@ namespace CRBM
             //w = w - lastW;
             //lastW = w;
 
-            if(i % LOG_MODULO == 0 || i == s().batchIterations || i == 1)
+            if(i % s().logModulo == 0 || i == s().batchIterations || i == 1)
             {
                 error = computeError(x, x2);
-                cout << "    " << i << " / " << s().batchIterations << ": " << error << flush;
 
-                if(i != s().batchIterations)
+                if(i != 1)
                 {
-                    if(ONE_ROW)
-                    {
-                            cout << "                  " << "\r" << flush;
-                    }
-                    else
-                    {
-                        cout << endl;
-                    }
+                    cout << ",";
                 }
+
+                cout << " (" << i << ") " << error << flush;
             }
         }
-        timer.tac("     ");
+        timer.tac("     ... in ");
 
         return error;
     }
 
-    void CRBMLayer::FunctionHidden(YAMATH::MatrixGpu &inHidden)
+    void CRBMLayer::FunctionHidden(YAMATH::MatrixGpu &inHidden) const
     {
-        //inHidden = inHidden.Sigmoid();
+        switch(s().activationFunctionH)
+        {
+            case 0: //linear
+                break;
+            case 1: //sigmoid
+                inHidden = inHidden.Sigmoid();
+                break;
+            default:
+                assert(0);// && "unknown activation function ID");
+        }
     }
-    void CRBMLayer::FunctionVisible(YAMATH::MatrixGpu &inVisible)
+    void CRBMLayer::FunctionVisible(YAMATH::MatrixGpu &inVisible) const
     {
-        //inVisible = inVisible.Sigmoid();
+        switch(s().activationFunctionV)
+        {
+            case 0: //linear
+                break;
+            case 1: //sigmoid
+                inVisible = inVisible.Sigmoid();
+                break;
+            default:
+                assert(0);// && "unknown activation function ID");
+        }
     }
 
     void  CRBMLayer::Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const
@@ -707,13 +730,28 @@ namespace CRBM
     }
 
     template<typename T>
-    void lvc(std::istream &in, const std::string &inName, const T &inValue)
+    void checkValRange(const T &wantedMin, const T &wantedMax, const T &got, const std::string &name = "")
+    {
+        if(got < wantedMin || got > wantedMax)
+        {
+            std::stringstream e;
+            if(name != "")
+            {
+                e << "in [" << name << "]";
+            }
+            e << "wanted [" << wantedMin << " .. " << wantedMax << "] but got [" << got << "]" << std::endl;
+
+            throw runtime_error(e.str());
+        }
+    }
+
+    template<typename T>
+    void lvc(std::istream &in, const std::string &inName, const T &inMinValue, const T &inMaxValue, T &outValue)
     {
         std::string name;
-        T v;
-        in >> name >> v;
+        in >> name >> outValue;
         checkVal(inName, name);
-        checkVal(inValue, v, inName);
+        checkValRange(inMinValue, inMaxValue, outValue, inName);
     }
 
     template<typename T>
@@ -740,7 +778,7 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        sv(out, "CRBMLayer", 1);
+        sv(out, "CRBMLayer", 2);
 
         sv(out, "learningSpeed", s().learningRate);
 
@@ -757,11 +795,15 @@ namespace CRBM
         sv(out, "hidden", s().hidden);
 
         sv(out, "weights", m_Weights);
+
+        sv(out, "activationFunctionH", s().activationFunctionH);
+        sv(out, "activationFunctionV", s().activationFunctionV);
     }
 
     void CRBMLayer::Load(std::istream &in)
     {
-        lvc(in, "CRBMLayer", 1);
+        int version = -1;
+        lvc(in, "CRBMLayer", 1, 2, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
 
@@ -778,6 +820,12 @@ namespace CRBM
         lv(in, "hidden", m_Setting.hidden);
 
         lv(in, "weights", m_Weights);
+        
+        if(version > 1)
+        {
+            lv(in, "activationFunctionH", m_Setting.activationFunctionH);
+            lv(in, "activationFunctionV", m_Setting.activationFunctionV);
+        }
     }
 
     void CRBMLayer::Save(const std::string &inName) const

@@ -99,7 +99,7 @@ int main(int argc, char** argv)
 
 
     timer.tic();
-    abc->LearnAll(xx);
+    abc->LearnAll(xx, string(argv[3]) + ".rbm");
     timer.tac("learning duration: ");
 
     if(abc->IsStopRequired())

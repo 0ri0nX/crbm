@@ -114,7 +114,7 @@ namespace CRBM
             //weights are reseted only when topology changes or forced by forceResetWeights flag
             void ResetSetting(const CRBMLayerSetting &inSetting, bool forceResetWeights = false);
     
-            float LearnAll(const YAMATH::MatrixGpu &inData);
+            float LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName = "");
             float LearnBatch(const YAMATH::MatrixGpu &inBatch);
             void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
             void Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
@@ -572,7 +572,7 @@ namespace CRBM
         return rr.getDataConst()[0]/(inW.getX()*inW.getY());
     }
 
-    float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData)
+    float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName)
     {
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
@@ -589,6 +589,11 @@ namespace CRBM
             t.tac();
 
             error = LearnBatch(batch);
+
+            if(i % s().saveInterval == 0 && inBackupFileName != "")
+            {
+                Save(inBackupFileName);
+            }
         }
 
         return error;

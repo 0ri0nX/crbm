@@ -223,6 +223,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
         EFE_DivideScalar,
         EFE_InverseAndMultiply,
         EFE_Sigmoid,
+        EFE_Minimally,
+        EFE_Maximally,
     };
 
     enum EAggregate
@@ -561,6 +563,11 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             OperationMatrixElementwiseBinary operator*(const MatrixGpu &inB) const;//elementwise multiplication!
             OperationMatrixElementwiseBinary operator/(const MatrixGpu &inB) const;
 
+            MatrixGpu &operator+=(const MatrixGpu &inB);
+            MatrixGpu &operator-=(const MatrixGpu &inB);
+            MatrixGpu &operator*=(const MatrixGpu &inB);//elementwise multiplication!
+            MatrixGpu &operator/=(const MatrixGpu &inB);
+
             //aggregation functions over all elements of a matrix
             OperationBinaryAssociative Sum(void) const;
             OperationBinaryAssociative Min(void) const;
@@ -581,6 +588,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             OperationMatrixApplyElementwise operator/(float inVal) const;
 
             OperationMatrixApplyElementwise Sigmoid(void) const;
+            OperationMatrixApplyElementwise Minimally(float inMin) const;
+            OperationMatrixApplyElementwise Maximally(float inMax) const;
 
             MatrixGpu &operator^=(float inExponent);
             MatrixGpu &operator*=(float inVal);
@@ -1129,6 +1138,12 @@ int MatrixGpu::m_Allocations = 0;
                     case EFE_Sigmoid:
                         outTarget[tid] = 1.0f/(1.0f + expf(-inSource[tid]));
                         break;
+                    case EFE_Minimally:
+                        outTarget[tid] = max(0.0f, inSource[tid]);
+                        break;
+                    case EFE_Maximally:
+                        outTarget[tid] = min(0.0f, inSource[tid]);
+                        break;
                 }
             }
         }
@@ -1231,8 +1246,11 @@ int MatrixGpu::m_Allocations = 0;
         }
     MatrixGpu& MatrixGpu::operator=(const MatrixGpu &inMatrix)
         {
-            Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.isTrans());
-            cudaMemcpy(getData(), inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToDevice);
+            if(this != &inMatrix)
+            {
+                Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.isTrans());
+                cudaMemcpy(getData(), inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToDevice);
+            }
 
             return *this;
         }
@@ -1334,25 +1352,26 @@ int MatrixGpu::m_Allocations = 0;
         }
 
     MatrixGpu &MatrixGpu::operator^=(float inExponent)
+    {
+        if(inExponent == 2.0f)
         {
-            if(inExponent == 2.0f)
-            {
-                return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f));
-            }
-            else if(inExponent == 0.5f)
-            {
-                return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Sqrt, 0.0f));
-            }
-            else
-            {
-                return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Pow, inExponent));
-            }
+            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f));
         }
+        else if(inExponent == 0.5f)
+        {
+            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Sqrt, 0.0f));
+        }
+        else
+        {
+            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Pow, inExponent));
+        }
+    }
 
     MatrixGpu &MatrixGpu::operator*=(float inVal)
-        {
-            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal));
-        }
+    {
+        return this->operator=(OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal));
+    }
+
     OperationMatrixElementwiseBinary MatrixGpu::operator+(const MatrixGpu &inB) const
     {
         return OperationMatrixElementwiseBinary(*this, inB, EFEB_Plus);
@@ -1371,6 +1390,26 @@ int MatrixGpu::m_Allocations = 0;
     OperationMatrixElementwiseBinary MatrixGpu::operator/(const MatrixGpu &inB) const
     {
         return OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide);
+    }
+
+    MatrixGpu &MatrixGpu::operator+=(const MatrixGpu &inB) 
+    {
+        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Plus));
+    }
+
+    MatrixGpu &MatrixGpu::operator-=(const MatrixGpu &inB)
+    {
+        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Minus));
+    }
+
+    MatrixGpu &MatrixGpu::operator*=(const MatrixGpu &inB)
+    {
+        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Multiply));
+    }
+
+    MatrixGpu &MatrixGpu::operator/=(const MatrixGpu &inB)
+    {
+        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide));
     }
 
 
@@ -1433,6 +1472,16 @@ int MatrixGpu::m_Allocations = 0;
     OperationMatrixApplyElementwise MatrixGpu::Sigmoid(void) const
     {
         return OperationMatrixApplyElementwise(*this, EFE_Sigmoid, 0.0f);
+    }
+
+    OperationMatrixApplyElementwise MatrixGpu::Minimally(float inMin) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_Minimally, inMin);
+    }
+
+    OperationMatrixApplyElementwise MatrixGpu::Maximally(float inMax) const
+    {
+        return OperationMatrixApplyElementwise(*this, EFE_Maximally, inMax);
     }
 
 //column-first order - ld is leading dimension size - #rows

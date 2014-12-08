@@ -129,8 +129,7 @@ namespace CRBM
             //all parameters are from this layer as well
             void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
     
-            void FunctionHidden(YAMATH::MatrixGpu &inHidden) const;
-            void FunctionVisible(YAMATH::MatrixGpu &inVisible) const;
+            void ActivationFunction(YAMATH::MatrixGpu &inData, int inFunctionType) const;
     
             void Save(std::ostream &outStream) const;
             void Load(std::istream &inStream);
@@ -602,13 +601,13 @@ namespace CRBM
         for(int i = 1; i <= s().batchIterations && !IsStopRequired(); ++i)
         {
             y = Mult(x, m_Weights);
-            FunctionHidden(y);
+            ActivationFunction(y, s().activationFunctionH);
 
             x2 = Mult(y, m_Weights.T());
-            FunctionVisible(x2);
+            ActivationFunction(x2, s().activationFunctionV);
 
             y2 = Mult(x2, m_Weights);
-            FunctionHidden(y2);
+            ActivationFunction(y2, s().activationFunctionH);
 
             dw1 = Mult(x.T(), y);
             dw2 = Mult(x2.T(), y2);
@@ -616,8 +615,8 @@ namespace CRBM
             dw1 *= (s().learningRate/x.getX());
             dw2 *= (s().learningRate/x.getX());
 
-            m_Weights = m_Weights + dw1;
-            m_Weights = m_Weights - dw2;
+            m_Weights += dw1;
+            m_Weights -= dw2;
 
             //lastW *= 0.00001;
             //w = w - lastW;
@@ -640,27 +639,17 @@ namespace CRBM
         return error;
     }
 
-    void CRBMLayer::FunctionHidden(YAMATH::MatrixGpu &inHidden) const
+    void CRBMLayer::ActivationFunction(YAMATH::MatrixGpu &inData, int inFunctionType) const
     {
-        switch(s().activationFunctionH)
+        switch(inFunctionType)
         {
             case 0: //linear
                 break;
             case 1: //sigmoid
-                inHidden = inHidden.Sigmoid();
+                inData = inData.Sigmoid();
                 break;
-            default:
-                assert(0);// && "unknown activation function ID");
-        }
-    }
-    void CRBMLayer::FunctionVisible(YAMATH::MatrixGpu &inVisible) const
-    {
-        switch(s().activationFunctionV)
-        {
-            case 0: //linear
-                break;
-            case 1: //sigmoid
-                inVisible = inVisible.Sigmoid();
+            case 2: //rectified linear
+                inData = inData.Minimally(0.0f);
                 break;
             default:
                 assert(0);// && "unknown activation function ID");
@@ -674,7 +663,7 @@ namespace CRBM
         Convolve(inData, x);
 
         y = Mult(x, m_Weights);
-        FunctionHidden(y);
+        ActivationFunction(y, s().activationFunctionH);
 
         RawOutput2UpperLayer(y, outData);
     }
@@ -690,7 +679,7 @@ namespace CRBM
         //msgG("y", inData);
 
         x = Mult(y, m_Weights.T());
-        FunctionVisible(x);
+        ActivationFunction(x, s().activationFunctionV);
 
         //msgG("x", x);
 

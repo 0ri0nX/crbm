@@ -594,18 +594,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             MatrixGpu &operator^=(float inExponent);
             MatrixGpu &operator*=(float inVal);
 
-            //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
-            //it is expected that matrix has m.x==x and m.y == y*z
-            MatrixGpu Convolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
-            MatrixGpu DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey, const MatrixGpu &inNormalizer) const;
-            MatrixGpu DeConvolveRaw(int x, int y, int z, int cx, int cy, int stridex, int stridey) const;
-            static MatrixGpu DeConvolveNormalizer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int number);
-
-            //all parameters are from lower layer
-            MatrixGpu TransformToUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const;
-            //all parameters are from lower layer as well
-            MatrixGpu TransformFromUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const;
-
         protected:
             void Init(int inX, int inY, bool inTransposed)
             {
@@ -905,7 +893,6 @@ int MatrixGpu::m_Allocations = 0;
 
                 int blocks = (num - 1) / ThreadsPerBlock + 1;
 
-                //parallelMatrixOperationBinary<<<blocks, ThreadsPerBlock/*, 2*ThreadsPerBlock*sizeof(float)*/>>>(m_A.getDataConst(), m_B.getDataCOnst(), num, m_Type, outMatrix.getData());
                 parallelMatrixOperationBinary<<<blocks, ThreadsPerBlock>>>(m_A.getDataConst(), m_B.getDataConst(), num, m_Type, outMatrix.getData());
 
                 debugMatrix(outMatrix);
@@ -1079,10 +1066,9 @@ int MatrixGpu::m_Allocations = 0;
 
     __global__ void applyFunction(float *outTarget, const float *inSource, int N, EFunctionElementwise inType, float inParam1)
         {
-            /* which element does this compute? */
+            // target index
             int tid = blockDim.x * blockIdx.x + threadIdx.x;
         
-            /* if valid, squre the array element */
             if (tid < N)
             {
                 switch(inType)
@@ -1153,7 +1139,6 @@ int MatrixGpu::m_Allocations = 0;
             assert (inMatrix.getX() == outMatrix.getX());
             assert (inMatrix.getY() == outMatrix.getY());
 
-            //static int BlocksPerGrid = 65535;
             static int ThreadsPerBlock = 512;
 
             dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
@@ -1162,9 +1147,8 @@ int MatrixGpu::m_Allocations = 0;
 
             dim3 blocksPerGrid((num - 1) / ThreadsPerBlock + 1, 1, 1);
 
-            //std::cout << "funcElementwise: " << num << ", " << blocksPerGrid.x << ", " << threadsPerBlock.x << std::endl;
-
             applyFunction<<<blocksPerGrid, threadsPerBlock>>>(outMatrix.getData(), inMatrix.getDataConst(), num, inType, inParam1);
+
             gpuErrchk( cudaPeekAtLastError() );
             gpuErrchk( cudaDeviceSynchronize() );
         }
@@ -1204,7 +1188,6 @@ int MatrixGpu::m_Allocations = 0;
     MatrixCpu::MatrixCpu(const MatrixCpu &inMatrix)
         {
             Init(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
-            //memcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float));
         }
 
     MatrixGpu::MatrixGpu(const MatrixGpu &inMatrix, bool inShallowCopy)
@@ -1213,7 +1196,6 @@ int MatrixGpu::m_Allocations = 0;
             m_Allocations += 1;
             cout << "m" << m_Allocations;
 #endif
-            //cout << "c";
             Init(inMatrix.getX(), inMatrix.getY(), inMatrix.isTrans());
             if(inShallowCopy)
             {
@@ -1232,7 +1214,6 @@ int MatrixGpu::m_Allocations = 0;
             m_Allocations += 1;
             cout << "m" << m_Allocations;
 #endif
-            //cout << "c";
             Init(inMatrix.getX(), inMatrix.getY(), false);
             cudaMemcpy(getData(), inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyHostToDevice);
         }
@@ -1310,11 +1291,6 @@ int MatrixGpu::m_Allocations = 0;
             return OperationMatrixMultiply(inA, inB);
         }
 
-    //OperationMatrixMultiply OperationMatrixTransform::operator*(const MatrixGpu &inB) const
-    //    {
-    //        return OperationMatrixMultiply(m_A, inB, m_Type, false);
-    //    }
-
     OperationMatrixAggregate MatrixGpu::AbsMax(void) const
         {
             return OperationMatrixAggregate(*this, EA_AbsMax);
@@ -1327,10 +1303,6 @@ int MatrixGpu::m_Allocations = 0;
         {
             return OperationMatrixAggregate(*this, EA_AbsSum);
         }
-    //OperationMatrixTransform MatrixGpu::operator^(const char *inType) const
-    //    {
-    //        return OperationMatrixTransform(*this, inType);
-    //    }
     OperationBinaryAssociative MatrixGpu::Sum(void) const
         {
             return OperationBinaryAssociative(*this, EFB_Plus);
@@ -1484,17 +1456,14 @@ int MatrixGpu::m_Allocations = 0;
         return OperationMatrixApplyElementwise(*this, EFE_Maximally, inMax);
     }
 
-//column-first order - ld is leading dimension size - #rows
-//#define IDX2C(i,j,ld) (((j)*(ld))+(i))
-
     __global__ void sample(float *outData, float *inData, float* inRnd, int x, int y, int N)
     {
-        /* which element does this compute? */
+        //target row id
         int rid = blockDim.x * blockIdx.x + threadIdx.x;
         
-        /* if valid, squre the array element */
         if (rid < N)
         {
+            //random row-id
             int row = int(inRnd[rid]*x);
 
             for(int i = 0; i < y; ++i)
@@ -1520,210 +1489,6 @@ int MatrixGpu::m_Allocations = 0;
 
         sample<<<blocksPerGrid, threadsPerBlock>>>(res.getData(), getDataConst(), rnd.getDataConst(), getX(), getY(), inRowsNum);
 
-        return res;
-    }
-
-    //a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
-    inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
-    {
-        int idx = im + c*totim + a*z*totim + b*x*z*totim;
-        //cout << "idx: " << idx << endl;
-        return idx;
-    }
-
-    void convolutionPatchesNumber(int x, int y, int z, int cx, int cy, int stridex, int stridey, int &outX, int &outY)
-    {
-
-        outX = (x-cx)/stridex+1;
-        outY = (y-cy)/stridey+1;
-    }
-
-    //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
-    //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
-    MatrixGpu MatrixGpu::Convolve(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
-    {
-        assert(getY() == x*y*z);
-
-        //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex+1;
-        int nv = (y-cy)/stridey+1;
-
-        int numImages = getX();
-        int numPatches = nh*nv;
-        int totImages = numPatches*numImages;
-
-        MatrixGpu res(totImages , cx*cy*z);
-
-//#define STREAMS_ON
-
-#ifdef STREAMS_ON
-        // allocate and initialize an array of stream handles
-        int nstreams = 14;
-        cout << "async " << nstreams << endl;
-        cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
-        for(int i = 0; i < nstreams; i++)
-        {
-            cudaStreamCreate(&(streams[i]));
-        }
-        int indexForStream = 0;
-#endif //STREAMS_ON
-
-        res = -1.0;
-
-        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
-        {
-            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
-            {
-                for(int ay = 0; ay < cy; ++ay)//y in convolution window
-                {
-                    for(int ax = 0; ax < cx; ++ax)//x in convolution window
-                    {
-                        for(int az = 0; az < z; ++az)//image layers
-                        {
-#ifdef STREAMS_ON
-                            cudaMemcpyAsync
-#else //STREAMS_ON
-                            cudaMemcpy
-#endif //STREAMS_ON
-
-                                (res.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
-                                     , getDataConst() + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
-                                     , sizeof(float)*numImages
-                                     , cudaMemcpyDeviceToDevice
-#ifdef STREAMS_ON
-                                     , streams[(++indexForStream) % nstreams]
-#endif //STREAMS_ON
-
-                                     );
-                            //goto breakit;
-                        }
-                    }
-                }
-            }
-        }
-//breakit:
-
-#ifdef STREAMS_ON
-        // release resources
-        for(int i = 0; i < nstreams; i++)
-        {
-            cudaDeviceSynchronize();
-            cudaStreamDestroy(streams[i]);
-        }
-#endif //STREAMS_ON
-
-        return res;
-    }
-
-    MatrixGpu MatrixGpu::DeConvolveNormalizer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int number)
-    {
-        //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex+1;
-        int nv = (y-cy)/stridey+1;
-        int numImages = number;
-
-        MatrixGpu res(numImages , x*y*z);
-
-        //int numPatches = nh*nv;
-
-        //int totImages = numPatches*numImages;
-
-        res = 0.0;
-
-        static int ThreadsPerBlock = 512;
-        int num = numImages;
-        int blocks = (num - 1) / ThreadsPerBlock + 1;
-
-        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
-        {
-            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
-            {
-                for(int ay = 0; ay < cy; ++ay)//y in convolution window
-                {
-                    for(int ax = 0; ax < cx; ++ax)//x in convolution window
-                    {
-                        for(int az = 0; az < z; ++az)//image layers
-                        {
-                            //float *dFrom = getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages); //convolution window target
-                            float *dTo = res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages); //convolution window source
-                            applyFunction<<<blocks, ThreadsPerBlock>>>(dTo, dTo, numImages, EFE_PlusScalar, 1.0f);
-
-                            //cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
-                            //         , getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
-                            //         , sizeof(float)*numImages
-                            //         , cudaMemcpyDeviceToDevice);
-                        }
-                        //goto breakit2;
-                    }
-                }
-            }
-        }
-//breakit2:
-        num = res.getX()*res.getY();
-        blocks = (num - 1) / ThreadsPerBlock + 1;
-        applyFunction<<<blocks, ThreadsPerBlock>>>(res.getData(), res.getDataConst(), num, EFE_InverseAndMultiply, 1.0f);
-
-        return res;
-    }
-
-    MatrixGpu MatrixGpu::DeConvolve(int x, int y, int z, int cx, int cy, int stridex, int stridey, const MatrixGpu &inNormalizer) const
-    {
-        MatrixGpu res = DeConvolveRaw(x, y, z, cx, cy, stridex, stridey);
-        cout << res.getX() << " x " << res.getY() << endl;
-        cout << inNormalizer.getX() << " x " << inNormalizer.getY() << endl;
-
-        res = res*inNormalizer;
-
-        return res;
-    }
-
-    MatrixGpu MatrixGpu::DeConvolveRaw(int x, int y, int z, int cx, int cy, int stridex, int stridey) const
-    {
-        //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex+1;
-        int nv = (y-cy)/stridey+1;
-        int numImages = getX() / (nh*nv);
-
-        assert(getY() == cx*cy*z);
-
-
-        MatrixGpu res(numImages , x*y*z);
-
-        int numPatches = nh*nv;
-
-        int totImages = numPatches*numImages;
-
-        res = 0.0;
-
-        static int ThreadsPerBlock = 512;
-        int num = numImages;
-        int blocks = (num - 1) / ThreadsPerBlock + 1;
-
-        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
-        {
-            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
-            {
-                for(int ay = 0; ay < cy; ++ay)//y in convolution window
-                {
-                    for(int ax = 0; ax < cx; ++ax)//x in convolution window
-                    {
-                        for(int az = 0; az < z; ++az)//image layers
-                        {
-                            float *dFrom = getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages); //convolution window target
-                            float *dTo = res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages); //convolution window source
-                            parallelMatrixOperationBinary<<<blocks, ThreadsPerBlock>>>(dTo, dFrom, numImages, EFEB_Plus, dTo);
-
-                            //cudaMemcpy(res.getData()  + pixelInColMajor(stridex*px + ax, stridey*py + ay, az, 0, x, y, z, numImages) //convolution window source
-                            //         , getDataConst() + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, cx, cy, z, totImages) //convolution window target
-                            //         , sizeof(float)*numImages
-                            //         , cudaMemcpyDeviceToDevice);
-                        }
-                        //goto breakit2;
-                    }
-                }
-            }
-        }
-//breakit2:
         return res;
     }
 
@@ -1771,159 +1536,6 @@ int MatrixGpu::m_Allocations = 0;
         }
 
         return *this;
-    }
-
-    MatrixGpu MatrixGpu::TransformToUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const
-    {
-        //MatrixGpu m = T();
-        //m.MakeHardCopy();
-
-        //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex+1;
-        int nv = (y-cy)/stridey+1;
-
-        int numPatches = nh*nv;
-        int total = getX()*getY();
-        int imageAllInOneSize = total/numImages;
-        //int totImages = numPatches*numImages;
-
-        int features = imageAllInOneSize/numPatches;
-
-        MatrixGpu res(numImages, imageAllInOneSize);
-
-//#define STREAMS_ON
-
-#ifdef STREAMS_ON
-        // allocate and initialize an array of stream handles
-        int nstreams = 14;
-        cout << "async " << nstreams << endl;
-        cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
-        for(int i = 0; i < nstreams; i++)
-        {
-            cudaStreamCreate(&(streams[i]));
-        }
-        int indexForStream = 0;
-#endif //STREAMS_ON
-
-        res = -1.0;
-
-        cout << "patches:" << numPatches << endl;
-        cout << "features:" << features << endl;
-        cout << "images:" << numImages << endl;
-
-        for(int p = 0; p < numPatches; ++p)//p - patch number
-        {
-            for(int f = 0; f < features; ++f)//f - number of features (hidden layer)
-            {
-                        {
-#ifdef STREAMS_ON
-                            cudaMemcpyAsync
-#else //STREAMS_ON
-                            cudaMemcpy
-#endif //STREAMS_ON
-
-                                (res.getData() + (f + p*features)*numImages //target
-                                     , getDataConst() + (f*numPatches + p)*numImages //source
-                                     , sizeof(float)*numImages
-                                     , cudaMemcpyDeviceToDevice
-#ifdef STREAMS_ON
-                                     , streams[(++indexForStream) % nstreams]
-#endif //STREAMS_ON
-
-                                     );
-                            //goto breakit;
-                        }
-            }
-        }
-//breakit:
-
-#ifdef STREAMS_ON
-        // release resources
-        for(int i = 0; i < nstreams; i++)
-        {
-            cudaDeviceSynchronize();
-            cudaStreamDestroy(streams[i]);
-        }
-#endif //STREAMS_ON
-
-        return res;
-    }
-
-    MatrixGpu MatrixGpu::TransformFromUpperLayer(int x, int y, int z, int cx, int cy, int stridex, int stridey, int numImages) const
-    {
-        //MatrixGpu m = T();
-        //m.MakeHardCopy();
-
-        //horizontal and vertical number of patches
-        int nh = (x-cx)/stridex+1;
-        int nv = (y-cy)/stridey+1;
-
-        int numPatches = nh*nv;
-        int total = getX()*getY();
-        int imageAllInOneSize = total/numImages;
-        //int totImages = numPatches*numImages;
-
-        int features = imageAllInOneSize/numPatches;
-
-        //res must be patches-number*rest
-        MatrixGpu res(numPatches*numImages, features);
-
-//#define STREAMS_ON
-
-#ifdef STREAMS_ON
-        // allocate and initialize an array of stream handles
-        int nstreams = 14;
-        cout << "async " << nstreams << endl;
-        cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
-        for(int i = 0; i < nstreams; i++)
-        {
-            cudaStreamCreate(&(streams[i]));
-        }
-        int indexForStream = 0;
-#endif //STREAMS_ON
-
-        res = -1.0;
-
-        cout << "patches:" << numPatches << endl;
-        cout << "features:" << features << endl;
-        cout << "images:" << numImages << endl;
-
-        for(int p = 0; p < numPatches; ++p)//p - patch number
-        {
-            for(int f = 0; f < features; ++f)//f - number of features (hidden layer)
-            {
-                        {
-#ifdef STREAMS_ON
-                            cudaMemcpyAsync
-#else //STREAMS_ON
-                            cudaMemcpy
-#endif //STREAMS_ON
-
-                                (res.getData() + (f*numPatches + p)*numImages //target
-                                     , getDataConst() + (f + p*features)*numImages //source
-                                     , sizeof(float)*numImages
-                                     , cudaMemcpyDeviceToDevice
-#ifdef STREAMS_ON
-                                     , streams[(++indexForStream) % nstreams]
-#endif //STREAMS_ON
-
-                                     );
-                            //goto breakit;
-                        }
-            }
-        }
-//breakit:
-
-#ifdef STREAMS_ON
-        // release resources
-        for(int i = 0; i < nstreams; i++)
-        {
-            cudaDeviceSynchronize();
-            cudaStreamDestroy(streams[i]);
-        }
-#endif //STREAMS_ON
-
-        return res;
     }
 }
 

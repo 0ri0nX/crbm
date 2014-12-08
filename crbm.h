@@ -559,6 +559,19 @@ namespace CRBM
     
         return rr.getDataConst()[0]/inInp.getX();
     }
+
+    float computeWeightSize(const YAMATH::MatrixGpu &inW)
+    {
+        YAMATH::MatrixGpu r2, r3;
+        r2 = inW;
+        r2 ^= 2.0f;
+        r3 = r2.Sum();
+    
+        YAMATH::MatrixCpu rr = r3;
+    
+        return rr.getDataConst()[0]/(inW.getX()*inW.getY());
+    }
+
     float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData)
     {
         int transX, transY;//transformed size
@@ -585,21 +598,20 @@ namespace CRBM
     {
         Timer timer;
 
-        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, lastW;
+        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2;
 
         //timer.tic();
         cout << "    Preparing data ... " << flush;
         Convolve(inBatch, x);
         timer.tac();
 
+        float weightSize = computeWeightSize(m_Weights);
+        cout << "    Weights' size: [" << weightSize << "]" << endl;
+
         //msgG("x", x);
         //msgG("w", m_Weights);
 
         timer.tic();
-        if(s().decayRate > 0.0f)
-        {
-            lastW = m_Weights;
-        }
 
         float error = -1.0f;
         cout << "    " << s().batchIterations << " iterations:" << flush;
@@ -621,20 +633,17 @@ namespace CRBM
             dw1 *= (s().learningRate/x.getX());
             dw2 *= (s().learningRate/x.getX());
 
-            m_Weights += dw1;
-            m_Weights -= dw2;
-
             if(s().decayRate > 0.0f)
             {
-                lastW *= (s().decayRate*s().learningRate/x.getX());
-                m_Weights -= lastW;
-                lastW = m_Weights;
+                m_Weights *= (1.0f - s().decayRate);
             }
+
+            m_Weights += dw1;
+            m_Weights -= dw2;
 
             if(i % s().logModulo == 0 || i == s().batchIterations || i == 1)
             {
                 error = computeError(x, x2);
-
                 if(i != 1)
                 {
                     cout << ",";

@@ -31,6 +31,7 @@ namespace CRBM
             iterations = 1000;
     
             learningRate = 0.001f;
+            decayRate = 0.0f;
     
             logModulo = 50;
 
@@ -67,6 +68,7 @@ namespace CRBM
             batchIterations = loadOption(f, "batchIterations",              batchIterations);
             iterations      = loadOption(f, "iterations",                   iterations);
             learningRate    = loadOption(f, "learningRate",                 learningRate);
+            decayRate       = loadOption(f, "decayRate",                    decayRate);
             logModulo       = loadOption(f, "logModulo",                    logModulo);
             saveInterval    = loadOption(f, "saveInterval",                 saveInterval);
             activationFunctionH               = loadOption(f, "activationFunctionH",                            activationFunctionH);
@@ -92,6 +94,7 @@ namespace CRBM
         int batchIterations;
         int iterations;
         float learningRate;
+        float decayRate;
 
         int activationFunctionH;
         int activationFunctionV;
@@ -593,7 +596,10 @@ namespace CRBM
         //msgG("w", m_Weights);
 
         timer.tic();
-        //lastW = m_Weights;
+        if(s().decayRate > 0.0f)
+        {
+            lastW = m_Weights;
+        }
 
         float error = -1.0f;
         cout << "    " << s().batchIterations << " iterations:" << flush;
@@ -618,9 +624,12 @@ namespace CRBM
             m_Weights += dw1;
             m_Weights -= dw2;
 
-            //lastW *= 0.00001;
-            //w = w - lastW;
-            //lastW = w;
+            if(s().decayRate > 0.0f)
+            {
+                lastW *= (s().decayRate*s().learningRate/x.getX());
+                m_Weights -= lastW;
+                lastW = m_Weights;
+            }
 
             if(i % s().logModulo == 0 || i == s().batchIterations || i == 1)
             {
@@ -767,7 +776,7 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        sv(out, "CRBMLayer", 2);
+        sv(out, "CRBMLayer", 3);
 
         sv(out, "learningSpeed", s().learningRate);
 
@@ -787,12 +796,14 @@ namespace CRBM
 
         sv(out, "activationFunctionH", s().activationFunctionH);
         sv(out, "activationFunctionV", s().activationFunctionV);
+
+        sv(out, "decayRate", s().decayRate);
     }
 
     void CRBMLayer::Load(std::istream &in)
     {
         int version = -1;
-        lvc(in, "CRBMLayer", 1, 2, version);
+        lvc(in, "CRBMLayer", 1, 3, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
 
@@ -814,6 +825,11 @@ namespace CRBM
         {
             lv(in, "activationFunctionH", m_Setting.activationFunctionH);
             lv(in, "activationFunctionV", m_Setting.activationFunctionV);
+        }
+
+        if(version > 2)
+        {
+            lv(in, "decayRate", m_Setting.decayRate);
         }
     }
 

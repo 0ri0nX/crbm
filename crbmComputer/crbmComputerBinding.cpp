@@ -2,7 +2,7 @@
 
 extern "C"
 {
-    CRBMStack* RBMStack_new(int inLength, const char** inWeights, int inGpuID)
+    CRBMStack* CRBMStack_new(int inLength, const char** inWeights, int inGpuID)
     {
         return new CRBMStack(inLength, inWeights, inGpuID);
     }

@@ -55,9 +55,12 @@ void CRBMStack::Transform(int inLenInData, const float* inData, int inLenOutData
 
     for(int i = 0; i < m_Layers.size(); ++i)
     {
+        Timer t;
         //cout << "   Transforming with layer " << i+1 << endl;
         m_Layers[i]->Transform(xx, y);
         xx = y;
+        cout << "Layer " << i << ": ";
+        t.tac("");
     }
 
     MatrixCpu resx = xx;

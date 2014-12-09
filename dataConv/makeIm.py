@@ -16,10 +16,6 @@ f.next()
 limit = 10
 
 for idx, j in enumerate(f):
-    limit -= 1
-    if limit <=0:
-        break
-
     r = [float(i)*255 for i in j.split(" ")]
     r = np.clip(r, 0, 255)
     r = list(np.array(r).astype(int))
@@ -39,4 +35,9 @@ for idx, j in enumerate(f):
         ii.save(prefix + "-" + str(idx).zfill(2) + ".jpg")
     except:
         print "bad"
+
+    limit -= 1
+    if limit <=0:
+        break
+
 

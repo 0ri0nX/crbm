@@ -3,16 +3,25 @@
 from PIL import Image as im
 import numpy as np
 import sys
+import time
 
 #size(200, 200)
 size = (10, 10)
 
 f = open(sys.argv[1])
 
-f.next()
+while True:
+    z = f.next()
+    if z.startswith("weights"):
+        break
+
 m = []
 for j in f:
-    r = [float(i) for i in j.split(" ")]
+    try:
+        r = [float(i) for i in j.split(" ")]
+    except:
+        break
+
     m.append(r)
 
 m = np.array(m)
@@ -42,4 +51,5 @@ for i in xrange(min(limit, m.shape[0])):
     ii = ii.resize((100, 100))
 
     ii.show()
+    time.sleep(0.1)
 

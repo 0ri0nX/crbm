@@ -5,6 +5,8 @@
 #include <curand.h>
 #include <limits>
 #include <float.h>
+#include <cstdlib>
+#include <ctime>
 
 namespace YAMATH
 {
@@ -412,6 +414,24 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                         set(inStartRow + i, inStartCol + j, inMatrix.get(i, j));
                     }
                 }
+            }
+            MatrixCpu Sample(int inRowsNum) const
+            {
+                MatrixCpu res(inRowsNum, getY());
+
+                srand(time(NULL));
+
+                for(int i = 0; i < inRowsNum; ++i)
+                {
+                    int randomRow = rand() % inRowsNum;
+
+                    for(int j = 0; j < getY(); ++j)
+                    {
+                        res.set(i, j, get(randomRow, j));
+                    }
+                }
+
+                return res;
             }
 
             void Reset(int inX, int inY, const float * inInit = NULL)

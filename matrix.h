@@ -317,9 +317,12 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 return inStream;
             }
 
-            std::ostream &Save(std::ostream &outStream) const
+            std::ostream &Save(std::ostream &outStream, bool addSizeInfo = true) const
             {
-                outStream << m_X << " " << m_Y << std::endl;
+                if(addSizeInfo)
+                {
+                    outStream << m_X << " " << m_Y << std::endl;
+                }
                 for(int i = 0; i < m_X; ++i)
                 {
                     if(m_Y > 0)
@@ -381,6 +384,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             {
                 assert(inStartRow >= 0 && inEndRow <= getX());
                 assert(inStartCol >= 0 && inEndCol <= getY());
+                
+                //cout << "submatrix: " << inEndRow - inStartRow << "x" << inEndCol - inStartCol << endl;
 
                 MatrixCpu m(inEndRow - inStartRow, inEndCol - inStartCol);
 
@@ -393,6 +398,20 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 }
 
                 return m;
+            }
+
+            void SubMatrixInsert(const MatrixCpu &inMatrix, int inStartRow, int inStartCol)//, int inEndRow, int inEndCol) //start is inclusive, end is NON inclusive
+            {
+                assert(inStartRow >= 0 && inStartRow+inMatrix.getX() <= getX());
+                assert(inStartCol >= 0 && inStartCol+inMatrix.getY() <= getY());
+
+                for(int i = 0; i < inMatrix.getX(); ++i)
+                {
+                    for(int j = 0; j < inMatrix.getY(); ++j)
+                    {
+                        set(inStartRow + i, inStartCol + j, inMatrix.get(i, j));
+                    }
+                }
             }
 
             void Reset(int inX, int inY, const float * inInit = NULL)
@@ -868,10 +887,10 @@ int MatrixGpu::m_Allocations = 0;
             OperationMatrixElementwiseBinary(const MatrixGpu& inA, const MatrixGpu& inB, EFunctionElementwiseBinary inType)
                 : m_A(inA), m_B(inB), m_Type(inType)
             {
-                if(inA.getX() != inB.getX() || inA.getY() != inB.getY())
-                {
-                    cout << "wanted: " << inA.getX() << "x" << inA.getY() << ", got " << inB.getX() << "x" << inB.getY() << endl;
-                }
+                //if(inA.getX() != inB.getX() || inA.getY() != inB.getY())
+                //{
+                //    cout << "wanted: " << inA.getX() << "x" << inA.getY() << ", got " << inB.getX() << "x" << inB.getY() << endl;
+                //}
                 assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
                 assert (inA.isTrans() == inB.isTrans());
             }

@@ -115,13 +115,13 @@ int main(int argc, char** argv)
 
     abc->Save(string(argv[3]) + ".rbm");
 
-    Mat transformed;
-    abc->Transform(xx, transformed);
-    saveMatrix(transformed, string(argv[3]) + ".transformed");
+    //Mat transformed;
+    //abc->Transform(xx, transformed);
+    //saveMatrix(transformed, string(argv[3]) + ".transformed");
 
-    Mat reconstructed;
-    abc->Reconstruct(transformed, reconstructed);
-    saveMatrix(reconstructed, string(argv[3]) + ".reconstructed");
+    //Mat reconstructed;
+    //abc->Reconstruct(transformed, reconstructed);
+    //saveMatrix(reconstructed, string(argv[3]) + ".reconstructed");
 
     return 0;
 }

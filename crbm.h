@@ -54,7 +54,7 @@ namespace CRBM
             //imgType = 0; //0 color, 1 grey, 2 edge
         }
     
-        virtual void loadFromStream(ifstream &f)
+        virtual void loadFromStream(std::ifstream &f)
         {
             x               = loadOption(f, "x",                            x);
             y               = loadOption(f, "y",                            y);
@@ -126,6 +126,9 @@ namespace CRBM
             void DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
             void SetDeConvolveNormalizer(int numImages);
             void getConvolutionPatchesNumber(int &outX, int &outY) const;
+
+            //returns size of transformed image
+            int getOutputSize(void) const;
     
             //all parameters are from this layer
             void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
@@ -145,11 +148,12 @@ namespace CRBM
 
             void ResetWeights(void);
     
-        protected:
-    
             //returns setting - for convenience
             const CRBMLayerSetting& s(void) const;
+
+         protected:
     
+   
             CRBMLayerSetting m_Setting;
     
             YAMATH::MatrixGpu m_Weights;
@@ -189,7 +193,7 @@ namespace CRBM
     {
         m_Weights.Reset(s().cx*s().cy*s().z, s().hidden);
         m_Weights.RandNormal(0.0f, 1.0f/(10.0*s().hidden));
-        cout << "weight matrix randomized!" << endl;
+        std::cout << "weight matrix randomized!" << std::endl;
     }
 
     const CRBMLayerSetting& CRBMLayer::s(void) const
@@ -216,7 +220,7 @@ namespace CRBM
     inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
     {
         int idx = im + c*totim + a*z*totim + b*x*z*totim;
-        //cout << "idx: " << idx << endl;
+        //cout << "idx: " << idx << std::endl;
         return idx;
     }
     
@@ -224,6 +228,15 @@ namespace CRBM
     {
         outX = (s().x-s().cx)/s().stridex+1;
         outY = (s().y-s().cy)/s().stridey+1;
+    }
+
+    int CRBMLayer::getOutputSize(void) const
+    {
+        int outx, outy;
+
+        getConvolutionPatchesNumber(outx, outy);
+
+        return outx*outy*s().hidden;
     }
 
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
@@ -247,7 +260,7 @@ namespace CRBM
 #ifdef STREAMS_ON
         // allocate and initialize an array of stream handles
         int nstreams = 14;
-        cout << "async " << nstreams << endl;
+        std::cout << "async " << nstreams << std::endl;
         cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
         for(int i = 0; i < nstreams; i++)
         {
@@ -408,10 +421,10 @@ namespace CRBM
 
         int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*s().hidden);
         //msgG("inBatch: ", inBatch);
-        //cout << "nh" << nh << endl;
-        //cout << "nv" << nv << endl;
-        //cout << "s().hidden" << s().hidden << endl;
-        //cout << "Num images" << numImages << endl;
+        //cout << "nh" << nh << std::endl;
+        //cout << "nv" << nv << std::endl;
+        //cout << "s().hidden" << s().hidden << std::endl;
+        //cout << "Num images" << numImages << std::endl;
 
         int numPatches = nh*nv;
         int total = inBatch.getX()*inBatch.getY();
@@ -426,7 +439,7 @@ namespace CRBM
 #ifdef STREAMS_ON
         // allocate and initialize an array of stream handles
         int nstreams = 14;
-        cout << "async " << nstreams << endl;
+        std::cout << "async " << nstreams << std::endl;
         cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
         for(int i = 0; i < nstreams; i++)
         {
@@ -435,9 +448,9 @@ namespace CRBM
         int indexForStream = 0;
 #endif //STREAMS_ON
 
-        //cout << "patches:" << numPatches << endl;
-        //cout << "features:" << features << endl;
-        //cout << "images:" << numImages << endl;
+        //cout << "patches:" << numPatches << std::endl;
+        //cout << "features:" << features << std::endl;
+        //cout << "images:" << numImages << std::endl;
 
         for(int p = 0; p < numPatches; ++p)//p - patch number
         {
@@ -495,7 +508,7 @@ namespace CRBM
 #ifdef STREAMS_ON
         // allocate and initialize an array of stream handles
         int nstreams = 14;
-        cout << "async " << nstreams << endl;
+        std::cout << "async " << nstreams << std::endl;
         cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
         for(int i = 0; i < nstreams; i++)
         {
@@ -507,9 +520,9 @@ namespace CRBM
         //TODO: remove
         //outBatch = -1.0;
 
-        //cout << "patches:" << numPatches << endl;
-        //cout << "features:" << s().hidden << endl;
-        //cout << "images:" << numImages << endl;
+        //cout << "patches:" << numPatches << std::endl;
+        //cout << "features:" << s().hidden << std::endl;
+        //cout << "images:" << numImages << std::endl;
 
         for(int p = 0; p < numPatches; ++p)//p - patch number
         {
@@ -577,14 +590,14 @@ namespace CRBM
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
 
-        cout << "On image " << s().x << "x" << s().y << "x" << s().z << " applied convolution " << s().cx << "x" << s().cy << " with stride " << s().stridex << "x" << s().stridey
-             << " => " << transX << "x" << transY << " patches." << endl;
+        std::cout << "On image " << s().x << "x" << s().y << "x" << s().z << " applied convolution " << s().cx << "x" << s().cy << " with stride " << s().stridex << "x" << s().stridey
+             << " => " << transX << "x" << transY << " patches." << std::endl;
 
         float error = -1;
         for(int i = 1; i <= s().iterations && !IsStopRequired(); ++i)
         {
             Timer t;
-            cout << i << " / " << s().iterations << " sampling ... " << flush;
+            std::cout << i << " / " << s().iterations << " sampling ... " << std::flush;
             YAMATH::MatrixGpu batch = inData.Sample(s().batchSize);
             t.tac();
 
@@ -606,12 +619,12 @@ namespace CRBM
         YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2;
 
         //timer.tic();
-        cout << "    Preparing data ... " << flush;
+        std::cout << "    Preparing data ... " << std::flush;
         Convolve(inBatch, x);
         timer.tac();
 
         float weightSize = computeWeightSize(m_Weights);
-        cout << "    Weights' size: [" << weightSize << "]" << endl;
+        std::cout << "    Weights' size: [" << weightSize << "]" << std::endl;
 
         //msgG("x", x);
         //msgG("w", m_Weights);
@@ -619,7 +632,7 @@ namespace CRBM
         timer.tic();
 
         float error = -1.0f;
-        cout << "    " << s().batchIterations << " iterations:" << flush;
+        std::cout << "    " << s().batchIterations << " iterations:" << std::flush;
 
         for(int i = 1; i <= s().batchIterations && !IsStopRequired(); ++i)
         {
@@ -651,10 +664,10 @@ namespace CRBM
                 error = computeError(x, x2);
                 if(i != 1)
                 {
-                    cout << ",";
+                    std::cout << ",";
                 }
 
-                cout << " (" << i << ") " << error << flush;
+                std::cout << " (" << i << ") " << error << std::flush;
             }
         }
         timer.tac("     ... in ");
@@ -722,7 +735,7 @@ namespace CRBM
         out << inName << " ";
         YAMATH::MatrixCpu m = inValue;
         m.Save(out);
-        out << endl;
+        out << std::endl;
     }
 
     template<typename T>
@@ -737,7 +750,7 @@ namespace CRBM
             }
             e << "wanted [" << wanted << "] but got [" << got << "]" << std::endl;
 
-            throw runtime_error(e.str());
+            throw std::runtime_error(e.str());
         }
     }
 
@@ -753,7 +766,7 @@ namespace CRBM
             }
             e << "wanted [" << wantedMin << " .. " << wantedMax << "] but got [" << got << "]" << std::endl;
 
-            throw runtime_error(e.str());
+            throw std::runtime_error(e.str());
         }
     }
 
@@ -852,7 +865,7 @@ namespace CRBM
         std::cout << "saving [" << inName << "] ... " << std::flush;
         Timer t;
 
-        ofstream f(inName.c_str());
+        std::ofstream f(inName.c_str());
         Save(f);
         f.close();
 
@@ -864,7 +877,7 @@ namespace CRBM
         std::cout << "Loading RBM layer [" << inName << "] ... " << std::flush;
         Timer t;
 
-        ifstream f(inName.c_str());
+        std::ifstream f(inName.c_str());
         Load(f);
         f.close();
 

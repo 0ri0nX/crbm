@@ -7,6 +7,8 @@
 #include <string>
 #include <time.h>
 #include <csignal>
+#include <iomanip>
+#include <cmath>
 
 using namespace std;
 
@@ -18,6 +20,15 @@ typedef MatrixGpu Mat;
 
 using namespace YAMATH;
 
+string getName(const string &inPrefix, int inIdx, int inTotal)
+{
+    stringstream s;
+    int w = ceil(log10(inTotal));
+    s << inPrefix.c_str() << setfill('0') << setw(w) << inIdx;
+
+    return s.str();
+}
+
 int main(int argc, char** argv)
 {
     if(argc < 5)
@@ -26,6 +37,7 @@ int main(int argc, char** argv)
         cout << argv[0] << " <gpu-id> <reconstruct|transform> input-vector-file crbm-file1 [crbm-file2] ..." << endl;
         exit(1);
     }
+
 
     cudaSetDevice(atoi(argv[1]));
     cublasStatus_t stat;
@@ -44,6 +56,10 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    int batchSize = 500;
+
+    cout << "Maximal batch size: " << batchSize << endl;
+
     MatrixCpu *xCpu = new MatrixCpu();
 
     loadMatrix(*xCpu, argv[3]);
@@ -51,8 +67,7 @@ int main(int argc, char** argv)
     int rows = xCpu->getX();
     int cols = xCpu->getY();
 
-    Mat xx = *xCpu;
-    msgG("loaded", xx);
+    int batchNum = (rows - 1) / batchSize + 1;
 
     std::vector<CRBM::CRBMLayer*> layers;
 
@@ -64,45 +79,88 @@ int main(int argc, char** argv)
         layers.push_back(l);
     }
 
-    Mat y;
-    //msgG("xx", xx);
-    //layers[0]->Convolve(xx, y);
-    //saveMatrix(y, string(argv[3]) + ".conv");
-    //msgG("conv(xx)", y);
-    //layers[0]->DeConvolve(y, xx);
-    //saveMatrix(xx, string(argv[3]) + ".convDeconv");
-    //msgG("deconv(conv(xx))", xx);
-
-    //exit(1);
-
-
-
-    for(int i = 0; i < layers.size(); ++i)
-    {
-        cout << "Transforming with layer " << i+1 << endl;
-        layers[i]->Transform(xx, y);
-        xx = y;
-    }
+    int resSize = -1;
+    string outFilename = string(argv[3]);
 
     if(computationType == "transform")
     {
-        saveMatrix(xx, string(argv[3]) + ".transformed");
-        return 0;
+        outFilename += ".transformed";
+
+        int outX, outY;
+        layers.back()->getConvolutionPatchesNumber(outX, outY);
+        resSize = outX*outY*layers.back()->s().hidden;
     }
-    
-    for(int i = layers.size() - 1; i >= 0; --i)
+    else
     {
-        cout << "Reconstructing with layer " << i+1 << endl;
-        layers[i]->Reconstruct(xx, y);
-        xx = y;
+        outFilename += ".reconstruct";
+        resSize = cols;
     }
 
-    if(computationType == "reconstruct")
+    ofstream f(outFilename.c_str());
+    f << rows << " " << resSize << endl;
+
+    Mat xx;
+    MatrixCpu tmpxx;
+    Timer timer;
+
+    for(int batch = 0; batch < batchNum; ++batch)
     {
-        saveMatrix(xx, string(argv[3]) + ".reconstruct");
-        return 0;
+        int a = batch*batchSize;
+        int b = min((batch+1)*batchSize, rows);
+
+        cout << batch+1 << " / " << batchNum << endl;
+
+        timer.tic();
+        xx = xCpu->SubMatrix(a, 0, b, cols);
+        timer.tac("   selected: ");
+
+        //msgG("loaded", xx);
+
+        Mat y;
+        //msgG("xx", xx);
+        //layers[0]->Convolve(xx, y);
+        //saveMatrix(y, string(argv[3]) + ".conv");
+        //msgG("conv(xx)", y);
+        //layers[0]->DeConvolve(y, xx);
+        //saveMatrix(xx, string(argv[3]) + ".convDeconv");
+        //msgG("deconv(conv(xx))", xx);
+
+        //exit(1);
+
+        for(int i = 0; i < layers.size(); ++i)
+        {
+            cout << "   Transforming with layer " << i+1 << endl;
+            layers[i]->Transform(xx, y);
+            xx = y;
+        }
+
+        if(computationType == "transform")
+        {
+            timer.tic();
+            tmpxx = xx;
+            tmpxx.Save(f, false);
+            timer.tac("   saved: ");
+            continue;
+        }
+        
+        for(int i = layers.size() - 1; i >= 0; --i)
+        {
+            cout << "   Reconstructing with layer " << i+1 << endl;
+            layers[i]->Reconstruct(xx, y);
+            xx = y;
+        }
+
+        if(computationType == "reconstruct")
+        {
+            timer.tic();
+            tmpxx = xx;
+            tmpxx.Save(f, false);
+            timer.tac("   saved: ");
+            continue;
+        }
     }
+
+    f.close();
 
     return 0;
-
 }

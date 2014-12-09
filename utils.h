@@ -47,7 +47,7 @@ void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)
     }
     else if(n == 1)
     {
-        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":[" << x.getDataConst()[0] << "]" << flush;
+        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":[" << x.getDataConst()[0] << "]" << std::flush;
     }
     else
     {
@@ -67,7 +67,7 @@ void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTran
 {
     std::cout << "loading [" << filename << "] ... " << std::flush;
     Timer t;
-    ifstream f(filename.c_str());
+    std::ifstream f(filename.c_str());
     inM.Load(f, inTransposed);
     f.close();
     t.tac();
@@ -78,7 +78,7 @@ void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
 {
     std::cout << "saving [" << filename << "] ... " << std::flush;
     Timer t;
-    ofstream f(filename.c_str());
+    std::ofstream f(filename.c_str());
     inM.Save(f);
     f.close();
     t.tac();

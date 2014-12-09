@@ -96,6 +96,8 @@ int main(int argc, char** argv)
         resSize = cols;
     }
 
+    cout << "Saving into: [" << outFilename << "]" << endl;
+
     ofstream f(outFilename.c_str());
     f << rows << " " << resSize << endl;
 
@@ -129,8 +131,10 @@ int main(int argc, char** argv)
 
         for(int i = 0; i < layers.size(); ++i)
         {
-            cout << "   Transforming with layer " << i+1 << endl;
+            timer.tic();
+            cout << "   Transforming with layer " << i+1 << flush;
             layers[i]->Transform(xx, y);
+            timer.tac(" ");
             xx = y;
         }
 
@@ -145,8 +149,10 @@ int main(int argc, char** argv)
         
         for(int i = layers.size() - 1; i >= 0; --i)
         {
-            cout << "   Reconstructing with layer " << i+1 << endl;
+            timer.tic();
+            cout << "   Reconstructing with layer " << i+1 << flush;
             layers[i]->Reconstruct(xx, y);
+            timer.tac(" ");
             xx = y;
         }
 
@@ -161,6 +167,7 @@ int main(int argc, char** argv)
     }
 
     f.close();
+    cout << "Saved into: [" << outFilename << "]" << endl;
 
     return 0;
 }

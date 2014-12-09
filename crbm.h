@@ -730,16 +730,28 @@ namespace CRBM
         }
     }
 
+//#define T_I Timer TTT;
+//#define T_M(x) TTT.tac(x ": "); TTT.tic();
+
+#define T_I
+#define T_M(x)
+
     void  CRBMLayer::Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const
     {
+        T_I;
         YAMATH::MatrixGpu x, y;
 
         Convolve(inData, x);
+        T_M("Conv");
 
         y = Mult(x, m_Weights);
+        T_M("Mult");
+
         ActivationFunction(y, s().activationFunctionH);
+        T_M("ActFunc");
 
         RawOutput2UpperLayer(y, outData);
+        T_M("Deconv");
     }
 
     void CRBMLayer::Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData)

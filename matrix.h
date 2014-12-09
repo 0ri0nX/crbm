@@ -415,9 +415,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                     }
                 }
             }
-            MatrixCpu Sample(int inRowsNum) const
+            void Sample(int inRowsNum, MatrixCpu &outSample) const
             {
-                MatrixCpu res(inRowsNum, getY());
+                outSample.Reset(inRowsNum, getY());
 
                 srand(time(NULL));
 
@@ -427,11 +427,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
                     for(int j = 0; j < getY(); ++j)
                     {
-                        res.set(i, j, get(randomRow, j));
+                        outSample.set(i, j, get(randomRow, j));
                     }
                 }
-
-                return res;
             }
 
             void Reset(int inX, int inY, const float * inInit = NULL)
@@ -527,7 +525,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
             void MakeHardCopy(void);
 
-            MatrixGpu Sample(int inRowsNum) const;
+            void Sample(int inRowsNum, MatrixGpu &outSample) const;
 
             void Reset(int inX, int inY, bool inTransposed = false)
             {
@@ -1513,12 +1511,12 @@ int MatrixGpu::m_Allocations = 0;
         }
     }
 
-    MatrixGpu MatrixGpu::Sample(int inRowsNum) const
+    void MatrixGpu::Sample(int inRowsNum, MatrixGpu &outSample) const
     {
         MatrixGpu rnd(inRowsNum, 1);
         rnd.RandUniform();
 
-        MatrixGpu res(inRowsNum, getY());
+        outSample.Reset(inRowsNum, getY());
 
         static int ThreadsPerBlock = 256;
 
@@ -1526,9 +1524,7 @@ int MatrixGpu::m_Allocations = 0;
 
         dim3 blocksPerGrid((inRowsNum - 1) / ThreadsPerBlock + 1, 1, 1);
 
-        sample<<<blocksPerGrid, threadsPerBlock>>>(res.getData(), getDataConst(), rnd.getDataConst(), getX(), getY(), inRowsNum);
-
-        return res;
+        sample<<<blocksPerGrid, threadsPerBlock>>>(outSample.getData(), getDataConst(), rnd.getDataConst(), getX(), getY(), inRowsNum);
     }
 
     void MatrixGpu::MakeHardCopy(void)

@@ -114,7 +114,12 @@ namespace CRBM
             //weights are reseted only when topology changes or forced by forceResetWeights flag
             void ResetSetting(const CRBMLayerSetting &inSetting, bool forceResetWeights = false);
     
+            //main data matrix is in GPU memory
             float LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName = "");
+
+            //main data matrix is in CPU memory
+            float LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName = "");
+
             float LearnBatch(const YAMATH::MatrixGpu &inBatch);
             void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
             void Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
@@ -585,20 +590,53 @@ namespace CRBM
         return rr.getDataConst()[0]/(inW.getX()*inW.getY());
     }
 
+    float CRBMLayer::LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName)
+    {
+        int transX, transY;//transformed size
+        getConvolutionPatchesNumber(transX, transY);
+
+        std::cout << "Main data in CPU memory" << std::endl;
+        std::cout << "On image " << s().x << "x" << s().y << "x" << s().z << " applied convolution " << s().cx << "x" << s().cy << " with stride " << s().stridex << "x" << s().stridey
+             << " => " << transX << "x" << transY << " patches." << std::endl;
+
+        float error = -1;
+        YAMATH::MatrixCpu batchCpu;
+        YAMATH::MatrixGpu batch;
+        for(int i = 1; i <= s().iterations && !IsStopRequired(); ++i)
+        {
+            Timer t;
+            std::cout << i << " / " << s().iterations << " sampling ... " << std::flush;
+            inData.Sample(s().batchSize, batchCpu);
+            batch = batchCpu;
+            t.tac();
+
+            error = LearnBatch(batch);
+
+            if(i % s().saveInterval == 0 && inBackupFileName != "")
+            {
+                Save(inBackupFileName);
+            }
+        }
+
+        return error;
+    }
+
     float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName)
     {
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
 
+        std::cout << "Main data in GPU memory" << std::endl;
         std::cout << "On image " << s().x << "x" << s().y << "x" << s().z << " applied convolution " << s().cx << "x" << s().cy << " with stride " << s().stridex << "x" << s().stridey
              << " => " << transX << "x" << transY << " patches." << std::endl;
 
         float error = -1;
+        YAMATH::MatrixGpu batch;
         for(int i = 1; i <= s().iterations && !IsStopRequired(); ++i)
         {
             Timer t;
             std::cout << i << " / " << s().iterations << " sampling ... " << std::flush;
-            YAMATH::MatrixGpu batch = inData.Sample(s().batchSize);
+            inData.Sample(s().batchSize, batch);
             t.tac();
 
             error = LearnBatch(batch);

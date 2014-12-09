@@ -90,16 +90,11 @@ int main(int argc, char** argv)
         timer.tac("  ... done in ");
     }
 
-    MatrixCpu *xCpu = new MatrixCpu();
-    loadMatrix(*xCpu, argv[3]);
-    Mat xx = *xCpu;
-
-    delete xCpu;
-    xCpu = new MatrixCpu();
-
+    MatrixCpu x;
+    loadMatrix(x, argv[3]);
 
     timer.tic();
-    abc->LearnAll(xx, string(argv[3]) + ".rbm");
+    abc->LearnAll(x, string(argv[3]) + ".rbm");
     timer.tac("learning duration: ");
 
     if(abc->IsStopRequired())
@@ -114,14 +109,6 @@ int main(int argc, char** argv)
     }
 
     abc->Save(string(argv[3]) + ".rbm");
-
-    //Mat transformed;
-    //abc->Transform(xx, transformed);
-    //saveMatrix(transformed, string(argv[3]) + ".transformed");
-
-    //Mat reconstructed;
-    //abc->Reconstruct(transformed, reconstructed);
-    //saveMatrix(reconstructed, string(argv[3]) + ".reconstructed");
 
     return 0;
 }

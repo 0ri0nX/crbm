@@ -272,9 +272,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     {
         public:
             MatrixCpu(int inX = 1, int inY = 1, const float * inInit = NULL) //column first order
-                : m_X(inX), m_Y(inY), m_Data(0)
+                : m_X(0), m_Y(0), m_Data(NULL)
             {
-                Init(inX, inY, inInit);
+                Reset(inX, inY, inInit);
             }
 
             MatrixCpu(const MatrixGpu &inMatrix);
@@ -434,17 +434,33 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
             void Reset(int inX, int inY, const float * inInit = NULL)
             {
-                if(m_X != inX || m_Y != inY)
+                assert (inX > 0 && inY > 0);
+
+                if(m_X*m_Y != inX*inY)
                 {
-                    delete [] m_Data;
+                    if(m_Data != NULL)
+                    {
+                        delete [] m_Data;
+                    }
+
+                    m_Data = new float [inX*inY];
                 }
-                Init(inX, inY, inInit);
+
+                m_X = inX;
+                m_Y = inY;
+
+                if(inInit != NULL)
+                {
+                    memcpy(m_Data, inInit, inX*inY*sizeof(float));
+                }
             }
+
             MatrixCpu &operator=(const MatrixGpu &inMatrix);
             MatrixCpu &operator=(const MatrixCpu &inMatrix);
 
         protected:
-            void Init(int inX, int inY, const float *inInit = NULL)
+
+            /*void Init(int inX, int inY, const float *inInit = NULL)
             {
                 assert (inX > 0 && inY > 0);
 
@@ -456,7 +472,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 {
                     memcpy(m_Data, inInit, inX*inY*sizeof(float));
                 }
-            }
+            }*/
 
             int m_X;
             int m_Y;
@@ -529,7 +545,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
             void Reset(int inX, int inY, bool inTransposed = false)
             {
-                if(m_X != inX || m_Y != inY)
+                if(m_X*m_Y != inX*inY)
                 {
                     m_Data = 0;
 
@@ -1217,14 +1233,16 @@ int MatrixGpu::m_Allocations = 0;
     };
 
     MatrixCpu::MatrixCpu(const MatrixGpu &inMatrix)
+        : m_X(0), m_Y(0), m_Data(NULL)
         {
-            Init(inMatrix.getX(), inMatrix.getY());
+            Reset(inMatrix.getX(), inMatrix.getY());
             cudaMemcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToHost);
         }
 
     MatrixCpu::MatrixCpu(const MatrixCpu &inMatrix)
+        : m_X(0), m_Y(0), m_Data(NULL)
         {
-            Init(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
+            Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
         }
 
     MatrixGpu::MatrixGpu(const MatrixGpu &inMatrix, bool inShallowCopy)

@@ -27,174 +27,8 @@ using namespace std;
 
 #include "crbm.h"
 
-class Timer
-{
-    public:
-        Timer(void)
-        {
-            tic();
-        }
-
-        void tic(void)
-        {
-            clock_gettime(CLOCK_MONOTONIC, &m_TimeSpec);
-        }
-
-        void tac(const string &inComment = "")
-        {
-            timespec ts;
-            clock_gettime(CLOCK_MONOTONIC, &ts);
-
-            float t = (ts.tv_sec - m_TimeSpec.tv_sec) + (ts.tv_nsec - m_TimeSpec.tv_nsec)/10e9;
-
-            cout << inComment << t << " sec" << endl;
-        }
-
-    private:
-
-        timespec m_TimeSpec;
-};
-
 
 using namespace YAMATH;
-
-void msgC(const char * inMsg, const MatrixCpu &x)
-{
-    int n = x.getX()*x.getY();
-    if(n > 400)
-    {
-        cout << inMsg << ": " << x.getX() << " x " << x.getY()
-             << "[ " << (x.getDataConst()[0]) << ", " << (x.getDataConst()[1]) << " ... " << (x.getDataConst()[n-2]) << ", " << (x.getDataConst()[n-1]) << " ]" << endl;
-    }
-    else if(n == 1)
-    {
-        cout  << inMsg << ":[" << x.getDataConst()[0] << "]" << flush;
-    }
-    else
-    {
-        cout  << inMsg << ":" << endl;
-        x.Save(cout);
-        cout << endl;
-    }
-}
-
-void msgG(const char * inMsg, const MatrixGpu &inM)
-{
-    MatrixCpu x = inM;
-    msgC(inMsg, x);
-}
-
-void loadMatrix(MatrixCpu &inM, const string& filename, bool inTransposed = false)
-{
-    cout << "loading [" << filename << "] ... " << endl;
-    Timer t;
-    ifstream f(filename.c_str());
-    inM.Load(f, inTransposed);
-    f.close();
-    t.tac("   ... done in ");
-    msgC(filename.c_str(), inM);
-}
-
-void saveMatrix(MatrixCpu &inM, const string &filename)
-{
-    cout << "saving [" << filename << "] ... " << endl;
-    Timer t;
-    ofstream f(filename.c_str());
-    inM.Save(f);
-    f.close();
-    t.tac("   ... done in ");
-    msgC(filename.c_str(), inM);
-}
-
-void saveGpuMatrix(MatrixGpu &inM, const string &filename)
-{
-    MatrixCpu resx = inM;
-    saveMatrix(resx, filename);
-}
-
-
-
-void ms(char * inMsg, const MatrixGpu &inM)
-{
-    //msgG(inMsg, inM);
-}
-
-
-void testGpu(int x, int y)
-{
-    typedef MatrixGpu M;
-    typedef MatrixCpu MC;
-    
-    cout << "GPU -----------" << endl;
-
-    MC ac(x, y);
-    for(int i = 0; i < ac.getX()*ac.getY(); ++i)
-    {
-        ac.getData()[i] = float(i);
-    }
-    M a = ac;
-    msgG("a - init", a);
-
-    //a = 11.0f;
-    //msgG("a=11.0f", a);
-
-    M b = a.AbsSum();
-    msgG("b=a.AbsSum()", b);
-
-    MC cc(y, 3);
-    for(int i = 0; i < cc.getX()*cc.getY(); ++i)
-    {
-        cc.getData()[i] = 0.0f;
-    }
-    cc.getData()[0] = 1.0f;
-    cc.getData()[y+1] = 1.0f;
-    cc.getData()[2*y+2] = 1.0f;
-    M c = cc;
-    msgG("c", c);
-
-    M d = Mult(a, c);
-    msgG("d=a*c", d);
-
-    
-}
-
-void testCpu(int x, int y)
-{
-    typedef MatrixCpu M;
-
-    cout << "CPU -----------" << endl;
-    
-    M a(x, y);
-    msgC("a - init", a);
-
-    //a = 11.0f;
-    for(int i = 0; i < a.getX()*a.getY(); ++i)
-    {
-        a.getData()[i] = 11;
-    }
-    msgC("a=11.0f", a);
-
-    M b(1,1);
-    float sum = 0.0f;
-    for(int i = 0; i < a.getX()*a.getY(); ++i)
-    {
-        sum += a.getData()[i];
-    }
-    b.getData()[0] = sum;
-    msgC("sum=a.AbsSum()", b);
-}
-
-//const float x1[] = {1.0f, 0.0f, 0.0f};
-//const float t1[] = {1.0f, 0.0f};
-//
-//const float x2[] = {1.0f, 0.0f, 1.0f};
-//const float t2[] = {1.0f, 0.0f};
-//
-//const float x3[] = {1.0f, 1.0f, 0.0f};
-//const float t3[] = {1.0f, 0.0f};
-//
-//const float x4[] = {1.0f, 1.0f, 1.0f};
-//const float t4[] = {0.0f, 1.0f};
 
 typedef MatrixGpu Mat;
 
@@ -218,7 +52,7 @@ float computeError(Mat &inInp, Mat &inOut)
 
 int main(int argc, char** argv)
 {
-    if(argc != 7 && argc != 8)
+/*    if(argc != 7 && argc != 8)
     {
         cout << "Too few params!" << endl;
         cout << argv[0] << " input-vector-file input-weight-file hidden-size learning-speed iter batch [cudadevice-id]" << endl;
@@ -473,7 +307,7 @@ int main(int argc, char** argv)
 
     cout << "done" << endl << "Min. test error = " << minErr << ", iteration = " << minIndex << endl;
 
-    cout << "done" << endl;
+    cout << "done" << endl;*/
     return 0;
 
 }

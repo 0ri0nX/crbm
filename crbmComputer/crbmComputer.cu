@@ -8,7 +8,7 @@
 
 #include "crbmComputer.h"
 
-#include "../crbm.h"
+#include "../src/crbm.h"
 using namespace std;
 using namespace YAMATH;
 

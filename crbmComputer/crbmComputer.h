@@ -19,10 +19,13 @@ class CRBMStack
         CRBMStack(int inLength, const char** inRBMFiles, int inGpuID = 0);
 
         int GetOutputSize(void) const;
+        int GetInputSize(void) const;
         ~CRBMStack(void);
 
         void Transform(const std::vector<float> &inData, std::vector<float> &outData) const;
         void Transform(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
+        void TransformBatch(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
+        void Reconstruct(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
 
 };
 

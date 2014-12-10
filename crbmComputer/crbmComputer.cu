@@ -84,7 +84,7 @@ void CRBMStack::TransformBatch(int inLenInData, const float* inData, int inLenOu
     MatrixGpu xx = xCpu;
     MatrixGpu y;
 
-    std::cout << "c++: " << sx << "x" << sy << std::endl;
+    //std::cout << "c++: " << sx << "x" << sy << std::endl;
 
     for(int i = 0; i < m_Layers.size(); ++i)
     {

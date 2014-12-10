@@ -132,8 +132,10 @@ namespace CRBM
             void SetDeConvolveNormalizer(int numImages);
             void getConvolutionPatchesNumber(int &outX, int &outY) const;
 
-            //returns size of transformed image
+            //returns size of transformed image (outx*outy*outz)
             int getOutputSize(void) const;
+            //returns size of input image (inx*iny*inz)
+            int getInputSize(void) const;
     
             //all parameters are from this layer
             void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
@@ -242,6 +244,11 @@ namespace CRBM
         getConvolutionPatchesNumber(outx, outy);
 
         return outx*outy*s().hidden;
+    }
+
+    int CRBMLayer::getInputSize(void) const
+    {
+        return s().x*s().y*s().z;
     }
 
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y

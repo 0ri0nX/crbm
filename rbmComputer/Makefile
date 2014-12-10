@@ -6,7 +6,7 @@ librbmcomputer.so: rbmComputerBinding.o rbmComputer.o
 %.o: %.cpp
 	g++ -fPIC -c -o $@ $^ -g
 %.o: %.cu
-	nvcc -Xcompiler '-fPIC' -D CUDA -c -o $@ $^ -g
+	nvcc --gpu-architecture=sm_35 -Xcompiler '-fPIC' -D CUDA -c -o $@ $^ -g
 
 clean:
 	rm -f *.o librbmcomputer.so

@@ -1,20 +1,22 @@
-import rbmComputer as r
+import crbmComputer as r
 
 from remote import RemoteFile
 
 REMOTESERVER = "orion.dev"
 
-WEIGHTS = ['weights/vectorsRBMGeorge.2473.2000.weights'
-         , 'weights/vectorsRBMGeorge.2473.2000.1000.weights'
-         , 'weights/vectorsRBMGeorge.2473.2000.1000.500.weights'
-         , 'weights/vectorsRBMGeorge.2473.2000.1000.500.200.weights'
-         , 'weights/vectorsRBMGeorge.2473.2000.1000.500.200.100.weights'
-         , 'weights/vectorsRBMGeorge.2473.2000.1000.500.200.100.50.weights']
+WEIGHTS = ["crbm/data5-5k-200x200x3.txt.rbm"
+         , "crbm/data5-5k-200x200x3.txt.transformed.rbm"
+         , "crbm/data5-5k-200x200x3.txt.transformed.transformed.rbm"
+         , "crbm/data5-5k-200x200x3.txt.transformed.transformed.transformed.rbm"
+         , "crbm/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.rbm"
+         , "crbm/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.transformed.rbm"]
+
 
 
 localWeights = [RemoteFile(i, REMOTESERVER).file_name for i in WEIGHTS]
+GPUID = 0
 
-RBMInstance = r.RBMComputer(localWeights, 0) 
+RBMInstance = r.CRBMComputer(localWeights, GPUID)
 
 def transform(val):
     global RBMInstance
@@ -23,4 +25,13 @@ def transform(val):
     res = list(res)
 
     return res
+
+def transformBatch(val):
+    global RBMInstance
+
+    res = RBMInstance.transformBatch(val)
+    res = list(res)
+
+    return res
+
 

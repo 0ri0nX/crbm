@@ -36,6 +36,8 @@ namespace CRBM
             logModulo = 50;
 
             saveInterval = 10;
+            incrementalSave = 0;
+            incrementalSaveStart = 1;
 
             activationFunctionH = 0;
             activationFunctionV = 0;
@@ -71,8 +73,10 @@ namespace CRBM
             decayRate       = loadOption(f, "decayRate",                    decayRate);
             logModulo       = loadOption(f, "logModulo",                    logModulo);
             saveInterval    = loadOption(f, "saveInterval",                 saveInterval);
-            activationFunctionH               = loadOption(f, "activationFunctionH",                            activationFunctionH);
-            activationFunctionV               = loadOption(f, "activationFunctionV",                            activationFunctionV);
+            incrementalSave = loadOption(f, "incrementalSave",              incrementalSave);
+            incrementalSaveStart            = loadOption(f, "incrementalSaveStart",                     incrementalSaveStart);
+            activationFunctionH             = loadOption(f, "activationFunctionH",                      activationFunctionH);
+            activationFunctionV             = loadOption(f, "activationFunctionV",                      activationFunctionV);
         }
     
         //image-size
@@ -101,6 +105,8 @@ namespace CRBM
    
         int logModulo;
         int saveInterval;
+        int incrementalSaveStart;
+        int incrementalSave;
     };
 
 
@@ -621,7 +627,17 @@ namespace CRBM
 
             if(i % s().saveInterval == 0 && inBackupFileName != "")
             {
-                Save(inBackupFileName);
+                std::stringstream ss;
+                ss << inBackupFileName;
+
+                if(s().incrementalSave)
+                {
+                    m_Setting.incrementalSaveStart += 1;
+
+                    ss << "." << (s().incrementalSaveStart-1);
+                }
+
+                Save(ss.str());
             }
         }
 
@@ -860,8 +876,9 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        sv(out, "CRBMLayer", 3);
+        sv(out, "CRBMLayer", 4);
 
+        //1
         sv(out, "learningSpeed", s().learningRate);
 
         sv(out, "x", s().x);
@@ -878,10 +895,17 @@ namespace CRBM
 
         sv(out, "weights", m_Weights);
 
+        //2
         sv(out, "activationFunctionH", s().activationFunctionH);
         sv(out, "activationFunctionV", s().activationFunctionV);
 
+        //3
         sv(out, "decayRate", s().decayRate);
+
+        //4
+        sv(out, "saveInterval", s().saveInterval);
+        sv(out, "incrementalSave", s().incrementalSave);
+        sv(out, "incrementalSaveStart", s().incrementalSaveStart);
     }
 
     void CRBMLayer::Load(std::istream &in)
@@ -905,15 +929,22 @@ namespace CRBM
 
         lv(in, "weights", m_Weights);
         
-        if(version > 1)
+        if(version >= 2)
         {
             lv(in, "activationFunctionH", m_Setting.activationFunctionH);
             lv(in, "activationFunctionV", m_Setting.activationFunctionV);
         }
 
-        if(version > 2)
+        if(version >= 3)
         {
             lv(in, "decayRate", m_Setting.decayRate);
+        }
+
+        if(version >= 4)
+        {
+            lv(in, "saveInterval", m_Setting.saveInterval);
+            lv(in, "incrementalSave", m_Setting.incrementalSave);
+            lv(in, "incrementalSaveStart", m_Setting.incrementalSaveStart);
         }
     }
 

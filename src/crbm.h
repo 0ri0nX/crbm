@@ -911,7 +911,7 @@ namespace CRBM
     void CRBMLayer::Load(std::istream &in)
     {
         int version = -1;
-        lvc(in, "CRBMLayer", 1, 3, version);
+        lvc(in, "CRBMLayer", 1, 4, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
 

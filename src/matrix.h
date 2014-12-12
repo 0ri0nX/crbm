@@ -7,6 +7,14 @@
 #include <float.h>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
+#include <sstream>
+#include <stdint.h>
+#include <stdint.h>
+#include <cassert>
+#include <cstdio>
+#include <stdexcept>
+
 
 namespace YAMATH
 {
@@ -280,77 +288,12 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             MatrixCpu(const MatrixGpu &inMatrix);
             MatrixCpu(const MatrixCpu &inMatrix);
 
-            std::istream &Load(std::istream &inStream, bool inTransposed = false)
-            {
 //column-first order - ld is leading dimension size - #rows
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
+            std::istream &Load(std::istream &inStream, bool inTransposed = false);
 
-                int x, y;
-                inStream >> x >> y;
-
-                assert (x >= 0 && y >= 0);
-
-                //cout << "x:" << x << "\ny:" << y << std::endl;
-
-                if(!inTransposed)
-                {
-                    Reset(x, y);
-                    for(int i = 0; i < x; ++i)
-                    {
-                        for(int j = 0; j < y; ++j)
-                        {
-                            inStream >> m_Data[IDX2C(i, j, x)];
-                        }
-                    }
-                }
-                else
-                {
-                    Reset(y, x);
-                    for(int i = 0; i < x; ++i)
-                    {
-                        for(int j = 0; j < y; ++j)
-                        {
-                            inStream >> m_Data[IDX2C(j, i, y)];
-                        }
-                    }
-                }
-
-
-                return inStream;
-            }
-
-            std::ostream &Save(std::ostream &outStream, bool addSizeInfo = true) const
-            {
-                if(addSizeInfo)
-                {
-                    outStream << m_X << " " << m_Y << std::endl;
-                }
-                for(int i = 0; i < m_X; ++i)
-                {
-                    if(m_Y > 0)
-                    {
-                        outStream << m_Data[IDX2C(i, 0, m_X)];
-                    }
-
-                    for(int j = 1; j < m_Y; ++j)
-                    {
-                        outStream << " " << m_Data[IDX2C(i, j, m_X)];
-                    }
-
-                    outStream << std::endl;
-                }
-                if(0)//raw data
-                {
-                    outStream << "raw:";
-                    for(int j = 0; j < m_Y*m_Y; ++j)
-                    {
-                        outStream << " " << m_Data[j];
-                    }
-                    outStream << std::endl;
-                }
-
-                return outStream;
-            }
+            std::ostream &SaveHeader(std::ostream &outStream, int expectedRows, int version = 2) const;
+            std::ostream &Save(std::ostream &outStream, bool addHeaderInfo = true, int version = 2) const;
 
             ~MatrixCpu(void)
             {
@@ -1590,6 +1533,227 @@ int MatrixGpu::m_Allocations = 0;
 
         return *this;
     }
+
+    std::istream &MatrixCpu::Load(std::istream &inStream, bool inTransposed)
+    {
+        std::string header;
+        std::getline(inStream, header, '\n');
+        //std::cout << "HEADER: [" << header << "]" << std::endl;
+    
+        const int lm = 6; //len(Matrix)
+    
+        if(header.substr(0, lm) == "Matrix")
+        {
+            std::stringstream hs(header.substr(lm, header.size() - 6));
+    
+            int version = -1;
+            hs >> version;
+    
+            if(version == 1)//images => divide each value by 255
+            {
+                int x = 0, y = 0;
+    
+                int sizeOfSavedInt = 4;
+                assert(sizeof(int) == sizeOfSavedInt);
+    
+                inStream.read((char*)&x, sizeOfSavedInt);
+                inStream.read((char*)&y, sizeOfSavedInt);
+    
+                std::cout << "x=" << x << ", y=" << y << std::endl;
+                assert (x >= 0 && y >= 0);
+    
+                uint8_t d[y];
+    
+                if(!inTransposed)
+                {
+                    Reset(x, y);
+                    for(int i = 0; i < x; ++i)
+                    {
+                        inStream.read((char*)d, y);
+    
+                        for(int j = 0; j < y; ++j)
+                        {
+                            m_Data[IDX2C(i, j, x)] = d[j]/255.0f;
+                        }
+                    }
+                }
+                else
+                {
+                    Reset(y, x);
+                    for(int i = 0; i < x; ++i)
+                    {
+                        inStream.read((char*)d, y);
+    
+                        for(int j = 0; j < y; ++j)
+                        {
+                            m_Data[IDX2C(j, i, y)] = d[j]/255.0f;
+                        }
+                    }
+                }
+            }
+            else if (version == 2)
+            {
+                int x = 0, y = 0;
+    
+                int sizeOfSavedInt = 4;
+                assert(sizeof(int) == sizeOfSavedInt);
+    
+                inStream.read((char*)&x, sizeOfSavedInt);
+                inStream.read((char*)&y, sizeOfSavedInt);
+    
+                std::cout << "x=" << x << ", y=" << y << std::endl;
+                assert (x >= 0 && y >= 0);
+    
+                float d[y];
+    
+                int sizeOfSavedFloat = 4;
+                assert(sizeof(float) == sizeOfSavedFloat);
+    
+                if(!inTransposed)
+                {
+                    Reset(x, y);
+                    for(int i = 0; i < x; ++i)
+                    {
+                        inStream.read((char*)d, y*sizeOfSavedFloat);
+    
+                        for(int j = 0; j < y; ++j)
+                        {
+                            m_Data[IDX2C(i, j, x)] = d[j];
+                        }
+                    }
+                }
+                else
+                {
+                    Reset(y, x);
+                    for(int i = 0; i < x; ++i)
+                    {
+                        inStream.read((char*)d, y*sizeOfSavedFloat);
+    
+                        for(int j = 0; j < y; ++j)
+                        {
+                            m_Data[IDX2C(j, i, y)] = d[j];
+                        }
+                    }
+                }
+            }
+        }
+        else//oldest-version
+        {
+            int x, y;
+            std::stringstream hs(header);
+            hs >> x >> y;
+    
+            assert (x >= 0 && y >= 0);
+    
+            //cout << "x:" << x << "\ny:" << y << std::endl;
+    
+            if(!inTransposed)
+            {
+                Reset(x, y);
+                for(int i = 0; i < x; ++i)
+                {
+                    for(int j = 0; j < y; ++j)
+                    {
+                        inStream >> m_Data[IDX2C(i, j, x)];
+                    }
+                }
+            }
+            else
+            {
+                Reset(y, x);
+                for(int i = 0; i < x; ++i)
+                {
+                    for(int j = 0; j < y; ++j)
+                    {
+                        inStream >> m_Data[IDX2C(j, i, y)];
+                    }
+                }
+            }
+        }
+    
+    
+        return inStream;
+    }
+    
+    std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, int expectedRows, int version) const
+    {
+        if(version == 0)
+        {
+            outStream << expectedRows << " " << m_Y << std::endl;
+        }
+        else if(version == 1)
+        {
+            assert(0);
+        }
+        else if(version == 2)
+        {
+            assert(0);
+        }
+        else
+        {
+            std::stringstream e;
+            e << "Unknown version for matrix save, wanted [0-2] but got [" << version << "]" << std::endl;
+
+            throw std::runtime_error(e.str());
+        }
+
+        return outStream;
+    }
+    std::ostream &MatrixCpu::Save(std::ostream &outStream, bool addHeaderInfo, int version) const
+    {
+        if(addHeaderInfo)
+        {
+            SaveHeader(outStream, getX(), version);
+        }
+
+        if(version == 0)
+        {
+            for(int i = 0; i < m_X; ++i)
+            {
+                if(m_Y > 0)
+                {
+                    outStream << m_Data[IDX2C(i, 0, m_X)];
+                }
+    
+                for(int j = 1; j < m_Y; ++j)
+                {
+                    outStream << " " << m_Data[IDX2C(i, j, m_X)];
+                }
+    
+                outStream << std::endl;
+            }
+        }
+        else if(version == 1)
+        {
+            assert(0);
+        }
+        else if(version == 2)
+        {
+            assert(0);
+        }
+        else
+        {
+            std::stringstream e;
+            e << "Unknown version for matrix save, wanted [0-2] but got [" << version << "]" << std::endl;
+
+            throw std::runtime_error(e.str());
+        }
+
+
+        if(0)//raw data
+        {
+            outStream << "raw:";
+            for(int j = 0; j < m_Y*m_Y; ++j)
+            {
+                outStream << " " << m_Data[j];
+            }
+            outStream << std::endl;
+        }
+    
+        return outStream;
+    }
+
 }
 
 #endif //MATRIX_H
+

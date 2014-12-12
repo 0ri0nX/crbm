@@ -130,7 +130,35 @@ void CRBMStack::Reconstruct(int inLenInData, const float* inData, int inLenOutDa
     MatrixGpu xx = xCpu;
     MatrixGpu y;
 
-    for(int i = m_Layers.size() - 1; i >=0; ++i)
+    for(int i = m_Layers.size() - 1; i >=0; --i)
+    {
+        Timer t;
+        m_Layers[i]->Reconstruct(xx, y);
+        xx = y;
+        cout << "Layer " << i << ": ";
+        t.tac("");
+    }
+
+    MatrixCpu resx = xx;
+
+    for(int i = 0; i < inLenOutData; ++i)
+    {
+        outData[i] = resx.getDataConst()[i];
+    }
+}
+
+void CRBMStack::ReconstructBatch(int inLenInData, const float* inData, int inLenOutData, float* outData) const
+{
+    assert(inLenInData % m_Layers.back()->getOutputSize() == 0);
+
+    int sx = inLenInData / m_Layers.back()->getOutputSize();
+    int sy = m_Layers.back()->getOutputSize();
+
+    MatrixCpu xCpu(sx, sy, inData);
+    MatrixGpu xx = xCpu;
+    MatrixGpu y;
+
+    for(int i = m_Layers.size() - 1; i >=0; --i)
     {
         Timer t;
         m_Layers[i]->Reconstruct(xx, y);

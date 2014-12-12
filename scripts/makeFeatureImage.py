@@ -3,46 +3,69 @@
 from PIL import Image as im
 import numpy as np
 import sys
+import crbmComputer as c
 import time
 
-#size(200, 200)
-size = (10, 10)
-target = (8, 8)
+
+def reconstruct(data):#list of data
+    #for idx, i in enumerate(data):
+    #    zz = instance.reconstruct(i)
+    #
+    #    print idx, zz[:10] 
+    
+    print "shape:", np.array(data).transpose().shape
+
+    batchX = np.array(data).transpose().flatten().tolist()
+    
+    #print batchX
+    
+    bb=instance.reconstructBatch(batchX)
+    bb = list(bb)
+
+    batchY = np.array(bb).reshape(instance.inputNum, len(bb)/instance.inputNum).transpose()
+    
+    for i in range(len(data)):
+        print i, batchY[i, :10]
+
+    return batchY
 
 if len(sys.argv) != 3:
-    print sys.argv[0], "<transformed-images> <rbm-files>"
-    print "  Expecting size", size
+    print sys.argv[0], "<transformed-images> <rbm-file1> ... <rbm-fileN>"
     exit(1)
 
-f = open(sys.argv[1])
-prefix = sys.argv[2]
+instance = c.CRBMComputer(["../dataConv/data5-5k-200x200x3.txt.rbm"
+    , "../dataConv/data5-5k-200x200x3.txt.transformed.rbm"
+    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.rbm"
+    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.rbm"
+    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.rbm"
+    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.transformed.rbm"
+    ], 1)
 
-while True:
-    z = f.next()
-    if z.startswith("weights"):
-        break
+#instance = c.CRBMComputer(sys.argv[2:], 1)
 
-m = []
-for j in f:
-    try:
-        r = [float(i) for i in j.split(" ")]
-    except:
-        break
+d = []
 
-    m.append(r)
+for i in range(min(1024, instance.outputNum)):
+    z = [0]*instance.outputNum
+    z[i] = 1.0
 
-m = np.array(m)
-m = m.transpose()
+    d.append(z)
 
-#mi = np.min(m)
-#ma = np.max(m)
-#m = np.clip(255.0*(m-mi)/(ma-mi), 0, 255).astype(int)
+m = reconstruct(d)
 
-limit = 100
+
+size =(200, 200)
+limit2 = 10
 ss = 100
-tar = im.new("RGB", size = (1+(ss+1)*target[0], 1+(ss+1)*target[1]))
+idx = 0
+prefix = 'test'
 
-for i in xrange(min(limit, m.shape[0])):
+for i in xrange(m.shape[0]):
+    if i % (limit2*limit2) == 0:
+        if i != 0:
+            tar.save(prefix + "-" + str(idx) + ".jpg")
+            idx += 1
+        tar = im.new("RGB", size = (1+(ss+1)*limit2, 1+(ss+1)*limit2))
 
     r = m[i]
 
@@ -57,10 +80,10 @@ for i in xrange(min(limit, m.shape[0])):
     
     ii.putdata(d)
     
-    ii = ii.resize((100, 100))
+    ii = ii.resize((ss, ss))
 
-    x = i / target[0]
-    y = i % target[0]
+    x = (i / limit2) % limit2
+    y = i % limit2
 
     tar.paste(ii, ((1+x*(ss+1), 1+y*(ss+1), (x+1)*(ss+1), (y+1)*(ss+1))))
 
@@ -68,48 +91,5 @@ for i in xrange(min(limit, m.shape[0])):
     #ii.show()
     #time.sleep(0.1)
 
-tar.save(prefix + "-all.jpg")
+tar.save(prefix + "-" + str(idx) + ".jpg")
 
-import crbmComputer as c
-from PIL import Image
-import numpy as n
-
-import time
-
-instance = c.CRBMComputer(["../dataConv/data5-5k-200x200x3.txt.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.transformed.rbm"], 1)
-
-batch = []
-num = 4
-for i in range(1, num+1):
-    ss = time.time()
-    try:
-        x=Image.open('/home/orionx/data/imageHash/obrazkyZeSerpu/data2/' + str(i))
-    except:
-        continue
-
-    x=x.resize((200, 200))
-
-    d=n.array(x.getdata())
-    d=(d/255.0).flatten()
-    d = d.tolist()
-    batch.append(d)
-
-    print "Preparation:", time.time() - ss
-
-    z = instance.transform(d)
-
-    print i, z[:10] 
-
-
-batchX = n.array(batch).transpose().flatten().tolist()
-
-print len(batchX)
-#print batchX
-
-bb=instance.transformBatch(batchX)
-bb = list(bb)
-
-batchY = n.array(bb).reshape(instance.outputNum, len(bb)/instance.outputNum).transpose()
-
-for i in range(0, num):
-    print i, batchY[i, :10]

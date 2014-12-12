@@ -511,7 +511,10 @@ namespace CRBM
     {
         //horizontal and vertical number of patches
         int nh, nv;
+
         getConvolutionPatchesNumber(nh, nv);
+
+        //std::cout << "nh=" << nh << ", nv=" << nv << ", s().hidden=" << s().hidden << ", inBatch.getX()=" << inBatch.getX() << ", inBatch.getY()=" << inBatch.getY() << std::endl;
 
         int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*s().hidden);
 

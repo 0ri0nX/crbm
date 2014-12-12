@@ -32,6 +32,11 @@ extern "C"
         inCRBMStack->Reconstruct(inLenInData, inData, inLenOutData, outData);
     }
 
+    void CRBMStack_ReconstructBatch(CRBMStack *inCRBMStack, int inLenInData, const float* inData, int inLenOutData, float* outData)
+    {
+        inCRBMStack->ReconstructBatch(inLenInData, inData, inLenOutData, outData);
+    }
+
     void CRBMStack_delete(CRBMStack* inCRBMStack)
     {
         delete inCRBMStack;

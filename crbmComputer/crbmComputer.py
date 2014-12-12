@@ -5,6 +5,8 @@ lib_CRBMStack_new = lib.CRBMStack_new
 lib_CRBMStack_delete = lib.CRBMStack_delete
 lib_CRBMStack_Transform = lib.CRBMStack_Transform
 lib_CRBMStack_TransformBatch = lib.CRBMStack_TransformBatch
+lib_CRBMStack_Reconstruct = lib.CRBMStack_Reconstruct
+lib_CRBMStack_ReconstructBatch = lib.CRBMStack_ReconstructBatch
 lib_CRBMStack_GetOutputSize = lib.CRBMStack_GetOutputSize
 lib_CRBMStack_GetOutputSize.restype = ctypes.c_int
 lib_CRBMStack_GetInputSize = lib.CRBMStack_GetInputSize
@@ -48,4 +50,16 @@ class CRBMComputer(object):
         TVOut = ctypes.c_float * self.inputNum
         outVector = TVOut()
         lib_CRBMStack_Reconstruct(self.crbm, ctypes.c_int(self.outputNum), TVIn(*inVector), ctypes.c_int(self.inputNum), outVector)
+        return outVector
+
+    def reconstructBatch(self, inVector):
+        assert len(inVector) % self.outputNum == 0
+        batchNum = len(inVector) / self.outputNum
+
+        TVIn = ctypes.c_float * (batchNum * self.outputNum)
+        TVOut = ctypes.c_float * (batchNum * self.inputNum)
+
+        outVector = TVOut()
+
+        lib_CRBMStack_ReconstructBatch(self.crbm, ctypes.c_int(self.outputNum * batchNum), TVIn(*inVector), ctypes.c_int(self.inputNum * batchNum), outVector)
         return outVector

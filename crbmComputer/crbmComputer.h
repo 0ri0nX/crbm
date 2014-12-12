@@ -26,6 +26,7 @@ class CRBMStack
         void Transform(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
         void TransformBatch(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
         void Reconstruct(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
+        void ReconstructBatch(int inLenInData, const float* inData, int inLenOutData, float* outData) const;
 
 };
 

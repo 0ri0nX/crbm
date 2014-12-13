@@ -810,7 +810,7 @@ namespace CRBM
     {
         out << inName << " ";
         YAMATH::MatrixCpu m = inValue;
-        m.Save(out);
+        m.Save(out, true, 2);
         out << std::endl;
     }
 
@@ -869,6 +869,7 @@ namespace CRBM
     {
         std::string name;
         in >> name;
+        in.ignore(1);
         assert(name == inName);
 
         YAMATH::MatrixCpu m;
@@ -879,7 +880,7 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        sv(out, "CRBMLayer", 4);
+        sv(out, "CRBMLayer", 5);
 
         //1
         sv(out, "learningSpeed", s().learningRate);
@@ -914,7 +915,7 @@ namespace CRBM
     void CRBMLayer::Load(std::istream &in)
     {
         int version = -1;
-        lvc(in, "CRBMLayer", 1, 4, version);
+        lvc(in, "CRBMLayer", 1, 5, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
 
@@ -949,6 +950,7 @@ namespace CRBM
             lv(in, "incrementalSave", m_Setting.incrementalSave);
             lv(in, "incrementalSaveStart", m_Setting.incrementalSaveStart);
         }
+        //5 - matrix version
     }
 
     void CRBMLayer::Save(const std::string &inName) const
@@ -956,7 +958,7 @@ namespace CRBM
         std::cout << "saving [" << inName << "] ... " << std::flush;
         Timer t;
 
-        std::ofstream f(inName.c_str());
+        std::ofstream f(inName.c_str(), ios::binary);
         Save(f);
         f.close();
 
@@ -968,7 +970,7 @@ namespace CRBM
         std::cout << "Loading RBM layer [" << inName << "] ... " << std::flush;
         Timer t;
 
-        std::ifstream f(inName.c_str());
+        std::ifstream f(inName.c_str(), ios::binary);
         Load(f);
         f.close();
 

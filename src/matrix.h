@@ -1538,7 +1538,7 @@ int MatrixGpu::m_Allocations = 0;
     {
         std::string header;
         std::getline(inStream, header, '\n');
-        //std::cout << "HEADER: [" << header << "]" << std::endl;
+        std::cout << "HEADER: [" << header << "]" << std::endl;
     
         const int lm = 6; //len(Matrix)
     
@@ -1549,18 +1549,22 @@ int MatrixGpu::m_Allocations = 0;
             int version = -1;
             hs >> version;
     
-            if(version == 1)//images => divide each value by 255
+            if(version == 1)//images ~ binary saved bytes => divide each value by 255
             {
-                int x = 0, y = 0;
+                std::getline(inStream, header, '\n');
+                std::stringstream hs(header);
+                int x, y;
+                hs >> x >> y;
     
-                int sizeOfSavedInt = 4;
-                assert(sizeof(int) == sizeOfSavedInt);
-    
-                inStream.read((char*)&x, sizeOfSavedInt);
-                inStream.read((char*)&y, sizeOfSavedInt);
-    
-                std::cout << "x=" << x << ", y=" << y << std::endl;
                 assert (x >= 0 && y >= 0);
+    
+                //int sizeOfSavedInt = 4;
+                //assert(sizeof(int) == sizeOfSavedInt);
+    
+                //inStream.read((char*)&x, sizeOfSavedInt);
+                //inStream.read((char*)&y, sizeOfSavedInt);
+    
+                //std::cout << "x=" << x << ", y=" << y << std::endl;
     
                 uint8_t d[y];
     
@@ -1591,18 +1595,22 @@ int MatrixGpu::m_Allocations = 0;
                     }
                 }
             }
-            else if (version == 2)
+            else if (version == 2)//binary saved floats
             {
-                int x = 0, y = 0;
+                std::getline(inStream, header, '\n');
+                std::stringstream hs(header);
+                int x, y;
+                hs >> x >> y;
     
-                int sizeOfSavedInt = 4;
-                assert(sizeof(int) == sizeOfSavedInt);
-    
-                inStream.read((char*)&x, sizeOfSavedInt);
-                inStream.read((char*)&y, sizeOfSavedInt);
-    
-                std::cout << "x=" << x << ", y=" << y << std::endl;
                 assert (x >= 0 && y >= 0);
+
+                //int sizeOfSavedInt = 4;
+                //assert(sizeof(int) == sizeOfSavedInt);
+    
+                //inStream.read((char*)&x, sizeOfSavedInt);
+                //inStream.read((char*)&y, sizeOfSavedInt);
+    
+                //std::cout << "x=" << x << ", y=" << y << std::endl;
     
                 float d[y];
     
@@ -1683,16 +1691,20 @@ int MatrixGpu::m_Allocations = 0;
         }
         else if(version == 1)
         {
-            assert(0);
+            std::stringstream e;
+            e << "Matrix 1 version cannot be saved!" << std::endl;
+
+            throw std::runtime_error(e.str());
         }
         else if(version == 2)
         {
-            assert(0);
+            outStream << "Matrix 2" << std::endl;
+            outStream << expectedRows << " " << m_Y << std::endl;
         }
         else
         {
             std::stringstream e;
-            e << "Unknown version for matrix save, wanted [0-2] but got [" << version << "]" << std::endl;
+            e << "Unknown version for matrix save, wanted [0 or 2] but got [" << version << "]" << std::endl;
 
             throw std::runtime_error(e.str());
         }
@@ -1725,11 +1737,32 @@ int MatrixGpu::m_Allocations = 0;
         }
         else if(version == 1)
         {
-            assert(0);
+            std::stringstream e;
+            e << "Matrix 1 version cannot be saved!" << std::endl;
+
+            throw std::runtime_error(e.str());
         }
         else if(version == 2)
         {
-            assert(0);
+            //int sizeOfSavedInt = 4, x = m_X, y = m_Y;
+            //assert(sizeof(int) == sizeOfSavedInt);
+
+            //outStream.write((char*)&x, sizeOfSavedInt);
+            //outStream.write((char*)&y, sizeOfSavedInt);
+
+            int sizeOfSavedFloat = 4;
+            assert(sizeof(float) == sizeOfSavedFloat);
+            float d[m_Y];
+
+            for(int i = 0; i < m_X; ++i)
+            {
+                for(int j = 0; j < m_Y; ++j)
+                {
+                    d[j] = m_Data[IDX2C(i, j, m_X)];
+                }
+
+                outStream.write((char*)d, m_Y*sizeOfSavedFloat);
+            }
         }
         else
         {

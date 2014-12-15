@@ -70,6 +70,7 @@ void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTran
     std::ifstream f(filename.c_str());
     inM.Load(f, inTransposed);
     f.close();
+    std::cout << inM.getX() << " x " << inM.getY() << "  ";
     t.tac();
     //msgC(filename.c_str(), inM);
 }

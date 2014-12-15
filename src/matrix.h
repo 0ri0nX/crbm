@@ -1538,7 +1538,7 @@ int MatrixGpu::m_Allocations = 0;
     {
         std::string header;
         std::getline(inStream, header, '\n');
-        std::cout << "HEADER: [" << header << "]" << std::endl;
+        //std::cout << "HEADER: [" << header << "]" << std::endl;
     
         const int lm = 6; //len(Matrix)
     

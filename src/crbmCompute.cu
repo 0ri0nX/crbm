@@ -99,7 +99,11 @@ int main(int argc, char** argv)
     cout << "Saving into: [" << outFilename << "]" << endl;
 
     ofstream f(outFilename.c_str());
-    f << rows << " " << resSize << endl;
+
+    const int saveVersion = 2;
+
+    MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
+    //f << rows << " " << resSize << endl;
 
     Mat xx;
     MatrixCpu tmpxx;
@@ -142,7 +146,7 @@ int main(int argc, char** argv)
         {
             timer.tic();
             tmpxx = xx;
-            tmpxx.Save(f, false);
+            tmpxx.Save(f, false, saveVersion);
             timer.tac("   saved: ");
             continue;
         }
@@ -160,7 +164,7 @@ int main(int argc, char** argv)
         {
             timer.tic();
             tmpxx = xx;
-            tmpxx.Save(f, false);
+            tmpxx.Save(f, false, saveVersion);
             timer.tac("   saved: ");
             continue;
         }

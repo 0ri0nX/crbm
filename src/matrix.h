@@ -292,7 +292,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
             std::istream &Load(std::istream &inStream, bool inTransposed = false);
 
-            std::ostream &SaveHeader(std::ostream &outStream, int expectedRows, int version = 2) const;
+            static std::ostream &SaveHeader(std::ostream &outStream, int expectedRows, int expectedCols, int version = 2);
             std::ostream &Save(std::ostream &outStream, bool addHeaderInfo = true, int version = 2) const;
 
             ~MatrixCpu(void)
@@ -1683,11 +1683,11 @@ int MatrixGpu::m_Allocations = 0;
         return inStream;
     }
     
-    std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, int expectedRows, int version) const
+    std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, int expectedRows, int expectedCols, int version)
     {
         if(version == 0)
         {
-            outStream << expectedRows << " " << m_Y << std::endl;
+            outStream << expectedRows << " " << expectedCols << std::endl;
         }
         else if(version == 1)
         {
@@ -1699,7 +1699,7 @@ int MatrixGpu::m_Allocations = 0;
         else if(version == 2)
         {
             outStream << "Matrix 2" << std::endl;
-            outStream << expectedRows << " " << m_Y << std::endl;
+            outStream << expectedRows << " " << expectedCols << std::endl;
         }
         else
         {
@@ -1715,7 +1715,7 @@ int MatrixGpu::m_Allocations = 0;
     {
         if(addHeaderInfo)
         {
-            SaveHeader(outStream, getX(), version);
+            SaveHeader(outStream, getX(), getY(), version);
         }
 
         if(version == 0)

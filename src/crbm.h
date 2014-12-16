@@ -591,7 +591,7 @@ namespace CRBM
     
         YAMATH::MatrixCpu rr = r3;
     
-        return rr.getDataConst()[0]/inInp.getX();
+        return rr.getDataConst()[0]/(inInp.getX()*inInp.getY());
     }
 
     float computeWeightSize(const YAMATH::MatrixGpu &inW)

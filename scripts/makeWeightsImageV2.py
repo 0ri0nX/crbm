@@ -6,6 +6,7 @@ import sys
 import time
 import struct
 import math
+import colorsys
 
 #size(200, 200)
 size = (10, 10)
@@ -66,10 +67,41 @@ def makeImage(filename, targetFilename):
     ma = 1.0
     #rescale = False
     rescale = True
+
+    def getH(d):
+        r = d[0::3]
+        g = d[1::3]
+        b = d[2::3]
     
+        Hdat = []
+        Sdat = []
+        Vdat = [] 
+        for rd,gn,bl in zip(r,g,b) :
+            h,s,v = colorsys.rgb_to_hsv(rd/255.,gn/255.,bl/255.)
+            Hdat.append(int(h*255.))
+            Sdat.append(int(s*255.))
+            Vdat.append(int(v*255.))
+        
+        return np.median(Hdat)
+
+    order = []
+    for i in xrange(min(limit, m.shape[0])):
+        r = m[i]
+    
+        if rescale:
+            mi = np.min(r)
+            ma = np.max(r)
+            #print ma, mi
+
+        r = np.clip(255.0*(r-mi)/(ma-mi), 0, 255).astype(int)
+
+        order.append((getH(r), i))
+
+    order = list(sorted(order, key = lambda x: x[0]))
+
     for i in xrange(min(limit, m.shape[0])):
     
-        r = m[i]
+        r = m[order[i][1]]
     
         if rescale:
             mi = np.min(r)
@@ -107,6 +139,9 @@ for i in sys.argv[2:]:
         raise
     fn = sys.argv[1] + "." + str(n).zfill(5) + ".jpg"
 
-    makeImage(i.strip(), fn)
+    try:
+        makeImage(i.strip(), fn)
+    except:
+        print "error"
 
 

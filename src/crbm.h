@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <sstream>
 #include "setting.h"
+#include <cmath>
 
 namespace CRBM
 {
@@ -591,7 +592,16 @@ namespace CRBM
     
         YAMATH::MatrixCpu rr = r3;
     
-        return rr.getDataConst()[0]/(inInp.getX()*inInp.getY());
+        float res = rr.getDataConst()[0]/(inInp.getX()*inInp.getY());
+
+        //if(res != res)
+        if(isnan(res) || isinf(res))
+        {
+            std::cout << "Returned " << res << " when computing error!" << std::endl;
+            exit(1);
+        }
+
+        return res;
     }
 
     float computeWeightSize(const YAMATH::MatrixGpu &inW)
@@ -958,7 +968,7 @@ namespace CRBM
         std::cout << "saving [" << inName << "] ... " << std::flush;
         Timer t;
 
-        std::ofstream f(inName.c_str(), ios::binary);
+        std::ofstream f(inName.c_str(), std::ios::binary);
         Save(f);
         f.close();
 
@@ -970,7 +980,7 @@ namespace CRBM
         std::cout << "Loading RBM layer [" << inName << "] ... " << std::flush;
         Timer t;
 
-        std::ifstream f(inName.c_str(), ios::binary);
+        std::ifstream f(inName.c_str(), std::ios::binary);
         Load(f);
         f.close();
 

@@ -35,8 +35,6 @@ class Timer
 };
 
 
-using namespace YAMATH;
-
 void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)
 {
     int n = x.getX()*x.getY();

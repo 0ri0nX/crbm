@@ -621,7 +621,7 @@ namespace CRBM
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
 
-        std::cout << "Main data in CPU memory" << std::endl;
+        std::cout << "Main data in CPU memory"<< std::setprecision(6) << std::scientific << std::endl;
         std::cout << "On image " << s().x << "x" << s().y << "x" << s().z << " applied convolution " << s().cx << "x" << s().cy << " with stride " << s().stridex << "x" << s().stridey
              << " => " << transX << "x" << transY << " patches." << std::endl;
 

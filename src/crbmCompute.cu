@@ -16,9 +16,9 @@ using namespace std;
 #include "utils.h"
 #include "crbm.h"
 
-typedef MatrixGpu Mat;
-
 using namespace YAMATH;
+
+typedef MatrixGpu Mat;
 
 string getName(const string &inPrefix, int inIdx, int inTotal)
 {
@@ -100,7 +100,7 @@ int main(int argc, char** argv)
 
     ofstream f(outFilename.c_str());
 
-    const int saveVersion = 2;
+    const int saveVersion = 0;
 
     MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
     //f << rows << " " << resSize << endl;

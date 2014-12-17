@@ -18,6 +18,7 @@
 
 namespace YAMATH
 {
+    typedef unsigned long t_index;
 
 //#define DEBUG_MATRIX_CLASS
 //#define DEBUG_ALLOCATION
@@ -52,7 +53,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 #endif
 
     template <typename T>
-    inline T* allocateGpu(int inNum)
+    inline T* allocateGpu(t_index inNum)
     {
 #ifdef DEBUG_ALLOCATION
         ++xxx;
@@ -79,7 +80,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     {
         struct Holder
         {
-            Holder(int inNum) :
+            Holder(t_index inNum) :
                 m_Counter(1), m_Data(NULL)
             {
                 //cudaMalloc((void**) &m_Data, inNum*sizeof(T));
@@ -99,9 +100,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
         };
 
         public:
-            GpuData(int inNum = 0)
+            GpuData(t_index inNum = 0)
             {
-                assert(inNum >= 0);
+                //assert(inNum >= 0);
 
                 if(inNum != 0)
                 {
@@ -140,7 +141,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 }
             }
 
-            GpuData<T> &operator=(int inNum)
+            GpuData<T> &operator=(t_index inNum)
             {
                 Dec();
 
@@ -167,7 +168,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 return *this;
             }
 
-            void Reset(int inNum = 0)
+            void Reset(t_index inNum = 0)
             {
                 Dec();
                 if(inNum != 0)
@@ -279,7 +280,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
     class MatrixCpu//column-first layout
     {
         public:
-            MatrixCpu(int inX = 1, int inY = 1, const float * inInit = NULL) //column first order
+            MatrixCpu(t_index inX = 1, t_index inY = 1, const float * inInit = NULL) //column first order
                 : m_X(0), m_Y(0), m_Data(NULL)
             {
                 Reset(inX, inY, inInit);
@@ -292,7 +293,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
             std::istream &Load(std::istream &inStream, bool inTransposed = false);
 
-            static std::ostream &SaveHeader(std::ostream &outStream, int expectedRows, int expectedCols, int version = 2);
+            static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version = 2);
             std::ostream &Save(std::ostream &outStream, bool addHeaderInfo = true, int version = 2) const;
 
             ~MatrixCpu(void)
@@ -300,12 +301,12 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 delete [] m_Data;
             }
 
-            int getX(void) const { return m_X; }
-            int getY(void) const { return m_Y; }
+            t_index getX(void) const { return m_X; }
+            t_index getY(void) const { return m_Y; }
             float* getDataConst(void) const { return m_Data; }
             float* getData(void) { return m_Data; }
 
-            void Reshape(int inX, int inY)
+            void Reshape(t_index inX, t_index inY)
             {
                 assert(getX()*getY() == inX*inY);
 
@@ -313,30 +314,30 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 m_Y = inY;
             }
 
-            inline void set(int inX, int inY, float inValue)
+            inline void set(t_index inX, t_index inY, float inValue)
             {
                 m_Data[IDX2C(inX, inY, getX())] = inValue;
             }
 
-            inline float get(int inX, int inY) const
+            inline float get(t_index inX, t_index inY) const
             {
                 return m_Data[IDX2C(inX, inY, getX())];
             }
 
             
 
-            MatrixCpu SubMatrix(int inStartRow, int inStartCol, int inEndRow, int inEndCol) //start is inclusive, end is NON inclusive
+            MatrixCpu SubMatrix(t_index inStartRow, t_index inStartCol, t_index inEndRow, t_index inEndCol) //start is inclusive, end is NON inclusive
             {
-                assert(inStartRow >= 0 && inEndRow <= getX());
-                assert(inStartCol >= 0 && inEndCol <= getY());
+                assert(inEndRow <= getX());
+                assert(inEndCol <= getY());
                 
                 //cout << "submatrix: " << inEndRow - inStartRow << "x" << inEndCol - inStartCol << endl;
 
                 MatrixCpu m(inEndRow - inStartRow, inEndCol - inStartCol);
 
-                for(int i = 0; i < m.getX(); ++i)
+                for(t_index i = 0; i < m.getX(); ++i)
                 {
-                    for(int j = 0; j < m.getY(); ++j)
+                    for(t_index j = 0; j < m.getY(); ++j)
                     {
                         m.set(i, j, get(inStartRow + i, inStartCol + j));
                     }
@@ -345,37 +346,37 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 return m;
             }
 
-            void SubMatrixInsert(const MatrixCpu &inMatrix, int inStartRow, int inStartCol)//, int inEndRow, int inEndCol) //start is inclusive, end is NON inclusive
+            void SubMatrixInsert(const MatrixCpu &inMatrix, t_index inStartRow, t_index inStartCol)//, t_index inEndRow, t_index inEndCol) //start is inclusive, end is NON inclusive
             {
-                assert(inStartRow >= 0 && inStartRow+inMatrix.getX() <= getX());
-                assert(inStartCol >= 0 && inStartCol+inMatrix.getY() <= getY());
+                assert(inStartRow+inMatrix.getX() <= getX());
+                assert(inStartCol+inMatrix.getY() <= getY());
 
-                for(int i = 0; i < inMatrix.getX(); ++i)
+                for(t_index i = 0; i < inMatrix.getX(); ++i)
                 {
-                    for(int j = 0; j < inMatrix.getY(); ++j)
+                    for(t_index j = 0; j < inMatrix.getY(); ++j)
                     {
                         set(inStartRow + i, inStartCol + j, inMatrix.get(i, j));
                     }
                 }
             }
-            void Sample(int inRowsNum, MatrixCpu &outSample) const
+            void Sample(t_index inRowsNum, MatrixCpu &outSample) const
             {
                 outSample.Reset(inRowsNum, getY());
 
                 srand(time(NULL));
 
-                for(int i = 0; i < inRowsNum; ++i)
+                for(t_index i = 0; i < inRowsNum; ++i)
                 {
-                    int randomRow = rand() % inRowsNum;
+                    t_index randomRow = rand() % inRowsNum;
 
-                    for(int j = 0; j < getY(); ++j)
+                    for(t_index j = 0; j < getY(); ++j)
                     {
                         outSample.set(i, j, get(randomRow, j));
                     }
                 }
             }
 
-            void Reset(int inX, int inY, const float * inInit = NULL)
+            void Reset(t_index inX, t_index inY, const float * inInit = NULL)
             {
                 assert (inX > 0 && inY > 0);
 
@@ -387,6 +388,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                     }
 
                     m_Data = new float [inX*inY];
+                    assert(m_Data != NULL);
                 }
 
                 m_X = inX;
@@ -403,7 +405,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
         protected:
 
-            /*void Init(int inX, int inY, const float *inInit = NULL)
+            /*void Init(t_index inX, t_index inY, const float *inInit = NULL)
             {
                 assert (inX > 0 && inY > 0);
 
@@ -417,8 +419,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 }
             }*/
 
-            int m_X;
-            int m_Y;
+            t_index m_X;
+            t_index m_Y;
             float *m_Data;
     };
 
@@ -438,7 +440,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             }
 
 
-            MatrixGpu(int x, int y, bool inTransposed = false)
+            MatrixGpu(t_index x, t_index y, bool inTransposed = false)
                 : m_X(x), m_Y(y), m_Data(0), m_Transposed(inTransposed)
             {
                 m_Data.Reset(m_X*m_Y);
@@ -463,8 +465,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 #endif
             }
 
-            int getX(void) const { return m_X; }
-            int getY(void) const { return m_Y; }
+            t_index getX(void) const { return m_X; }
+            t_index getY(void) const { return m_Y; }
             float* getDataConst(void) const { return m_Data.raw(); }
             float* getData(void) { return m_Data.raw(); }
 
@@ -484,9 +486,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
             void MakeHardCopy(void);
 
-            void Sample(int inRowsNum, MatrixGpu &outSample) const;
+            void Sample(t_index inRowsNum, MatrixGpu &outSample) const;
 
-            void Reset(int inX, int inY, bool inTransposed = false)
+            void Reset(t_index inX, t_index inY, bool inTransposed = false)
             {
                 if(m_X*m_Y != inX*inY)
                 {
@@ -500,7 +502,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 }
             }
 
-            void Reshape(int inX, int inY)
+            void Reshape(t_index inX, t_index inY)
             {
                 assert(getX()*getY() == inX*inY);
 
@@ -591,7 +593,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
             MatrixGpu &operator*=(float inVal);
 
         protected:
-            void Init(int inX, int inY, bool inTransposed)
+            void Init(t_index inX, t_index inY, bool inTransposed)
             {
                 m_X = inX;
                 m_Y = inY;
@@ -600,8 +602,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 m_ShallowCopy = false;
             }
 
-            int m_X;
-            int m_Y;
+            t_index m_X;
+            t_index m_Y;
             GpuData<float> m_Data;
             bool m_Transposed;
             bool m_ShallowCopy;
@@ -640,7 +642,7 @@ int MatrixGpu::m_Allocations = 0;
 
             virtual void Execute(MatrixGpu &outMatrix) const = 0;
 
-            virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const = 0;
+            virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const = 0;
 
             virtual ~OperationGpu(void)
             {
@@ -664,15 +666,15 @@ int MatrixGpu::m_Allocations = 0;
             OperationMatrixMultiply(const MatrixGpu& inA, const MatrixGpu& inB)
                 : m_A(inA), m_B(inB)
             {
-                int kA = !inA.isTrans() ? m_A.getY() : m_A.getX();
-                int kB = !inB.isTrans() ? m_B.getX() : m_B.getY();
+                t_index kA = !inA.isTrans() ? m_A.getY() : m_A.getX();
+                t_index kB = !inB.isTrans() ? m_B.getX() : m_B.getY();
                 //std::cout << "Mult:" << kA << " vs " << kB << std::endl;
                 //std::cout << " " << m_A.getX() << "x" << m_A.getY() << (inA.isTrans() ? "T" : "") << std::endl;
                 //std::cout << " " << m_B.getX() << "x" << m_B.getY() << (inB.isTrans() ? "T" : "") << std::endl;
                 assert(kA == kB);
             }
 
-            virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const
+            virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
             {
                 outX = !m_A.isTrans() ? m_A.getX() : m_A.getY();
                 outY = !m_B.isTrans() ? m_B.getY() : m_B.getX();
@@ -683,10 +685,10 @@ int MatrixGpu::m_Allocations = 0;
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
-                int x = !m_A.isTrans() ? m_A.getX() : m_A.getY();
-                int y = !m_B.isTrans() ? m_B.getY() : m_B.getX();
-                int kA = !m_A.isTrans() ? m_A.getY() : m_A.getX();
-                int kB = !m_B.isTrans() ? m_B.getX() : m_B.getY();
+                t_index x = !m_A.isTrans() ? m_A.getX() : m_A.getY();
+                t_index y = !m_B.isTrans() ? m_B.getY() : m_B.getX();
+                t_index kA = !m_A.isTrans() ? m_A.getY() : m_A.getX();
+                t_index kB = !m_B.isTrans() ? m_B.getX() : m_B.getY();
 
                 //cout << "TA:" << m_A.isTrans() << ", TB:" << m_B.isTrans() << endl;
                 assert(kA == kB);
@@ -711,11 +713,11 @@ int MatrixGpu::m_Allocations = 0;
             const MatrixGpu& m_B;
     };
 
-    __global__ void parallelAssociativeOperator(const float *inData, int inN, EFunctionBinaryAssociative inType, float *outBlockResults)
+    __global__ void parallelAssociativeOperator(const float *inData, t_index inN, EFunctionBinaryAssociative inType, float *outBlockResults)
     {
         extern __shared__ float sd[];
 
-        unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
+        t_index idx = blockIdx.x*blockDim.x + threadIdx.x;
 
         float myData;
         switch(inType)
@@ -744,7 +746,7 @@ int MatrixGpu::m_Allocations = 0;
 
         sd[threadIdx.x] = myData;
 
-        for(int offset = blockDim.x / 2; offset > 0; offset >>= 1)
+        for(t_index offset = blockDim.x / 2; offset > 0; offset >>= 1)
         {
             __syncthreads();
 
@@ -790,7 +792,7 @@ int MatrixGpu::m_Allocations = 0;
             {
             }
 
-            virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const
+            virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
             {
                 outX = 1;
                 outY = 1;
@@ -803,16 +805,16 @@ int MatrixGpu::m_Allocations = 0;
 
                 outMatrix.Reset(1, 1);
 
-                static int ThreadsPerBlock = 512;
-                int num = m_A.getX()*m_A.getY();
+                static t_index ThreadsPerBlock = 512;
+                t_index num = m_A.getX()*m_A.getY();
 
-                int blocks = (num - 1) / ThreadsPerBlock + 1;
+                t_index blocks = (num - 1) / ThreadsPerBlock + 1;
                 GpuData<float> tmp(blocks);
                 parallelAssociativeOperator<<<blocks, ThreadsPerBlock, ThreadsPerBlock*sizeof(float)>>>(m_A.getDataConst(), num, m_Type, tmp.raw());
 
                 while(blocks > ThreadsPerBlock)//repetitive call
                 {
-                    int num = blocks;
+                    t_index num = blocks;
                     blocks = (num -1) / ThreadsPerBlock + 1;
 
                     GpuData<float> tmp2(blocks);
@@ -831,11 +833,11 @@ int MatrixGpu::m_Allocations = 0;
     };
 
 
-    __global__ void parallelMatrixOperationBinary(const float *inA, const float *inB, int inN, EFunctionElementwiseBinary inType, float *outResult)
+    __global__ void parallelMatrixOperationBinary(const float *inA, const float *inB, t_index inN, EFunctionElementwiseBinary inType, float *outResult)
     {
         //extern __shared__ float sd[];
 
-        unsigned int idx = blockIdx.x*blockDim.x + threadIdx.x;
+        t_index idx = blockIdx.x*blockDim.x + threadIdx.x;
 
         //load to shared memory
         if(idx < inN)
@@ -872,7 +874,7 @@ int MatrixGpu::m_Allocations = 0;
                 assert (inA.isTrans() == inB.isTrans());
             }
 
-            virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const
+            virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
             {
                 outX = m_A.getX();
                 outY = m_A.getY();
@@ -883,11 +885,11 @@ int MatrixGpu::m_Allocations = 0;
             {
                 //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
-                static int ThreadsPerBlock = 512;
+                static t_index ThreadsPerBlock = 512;
 
-                int num = m_A.getX()*m_A.getY();
+                t_index num = m_A.getX()*m_A.getY();
 
-                int blocks = (num - 1) / ThreadsPerBlock + 1;
+                t_index blocks = (num - 1) / ThreadsPerBlock + 1;
 
                 parallelMatrixOperationBinary<<<blocks, ThreadsPerBlock>>>(m_A.getDataConst(), m_B.getDataConst(), num, m_Type, outMatrix.getData());
 
@@ -901,20 +903,20 @@ int MatrixGpu::m_Allocations = 0;
     };
 
 
-    __global__ void transposeSimple(float *outData, const float *inData, int inSourceX, int inSourceY)
+    __global__ void transposeSimple(float *outData, const float *inData, t_index inSourceX, t_index inSourceY)
     {
         extern __shared__ float tile[];
 
-        int sharedIdx = threadIdx.x*blockDim.y + threadIdx.y;
+        t_index sharedIdx = threadIdx.x*blockDim.y + threadIdx.y;
         
-        int sourceX = blockDim.x*blockIdx.x + threadIdx.x;
-        int sourceY = blockDim.y*blockIdx.y + threadIdx.y;
+        t_index sourceX = blockDim.x*blockIdx.x + threadIdx.x;
+        t_index sourceY = blockDim.y*blockIdx.y + threadIdx.y;
 
         //range-check
         if(sourceX < inSourceX && sourceY < inSourceY)
         {
-            int sourceIdx = sourceY*inSourceX + sourceX;
-            int targetIdx = sourceX*inSourceY + sourceY;
+            t_index sourceIdx = sourceY*inSourceX + sourceX;
+            t_index targetIdx = sourceX*inSourceY + sourceY;
 
             tile[sharedIdx] = inData[sourceIdx];
             
@@ -924,12 +926,12 @@ int MatrixGpu::m_Allocations = 0;
         }
     }
 
-    void transpose(float *outData, const float *inData, int inSourceX, int inSourceY)
+    void transpose(float *outData, const float *inData, t_index inSourceX, t_index inSourceY)
         {
-            static int ThreadsPerBlock = 96; //shared memory need to be at least sizeof(float) * ThreadsPerBlock^2
+            static t_index ThreadsPerBlock = 96; //shared memory need to be at least sizeof(float) * ThreadsPerBlock^2
 
-            int sx = min(ThreadsPerBlock, inSourceX);
-            int sy = min(ThreadsPerBlock, inSourceY);
+            t_index sx = min(ThreadsPerBlock, inSourceX);
+            t_index sy = min(ThreadsPerBlock, inSourceY);
 
             dim3 threadsPerBlock(sx, sy, 1);
 
@@ -946,16 +948,16 @@ int MatrixGpu::m_Allocations = 0;
 #define TILE_DIM 32
 #define BLOCK_ROWS 8
 
-    __global__ void transposeCoalesced(float *odata, const float *idata, int inMaxX, int inMaxY)
+    __global__ void transposeCoalesced(float *odata, const float *idata, t_index inMaxX, t_index inMaxY)
     {
         __shared__ float tile[TILE_DIM][TILE_DIM+1];
         
-        int x = blockIdx.x * TILE_DIM + threadIdx.x;
-        int y = blockIdx.y * TILE_DIM + threadIdx.y;
+        t_index x = blockIdx.x * TILE_DIM + threadIdx.x;
+        t_index y = blockIdx.y * TILE_DIM + threadIdx.y;
 
-        int width = gridDim.x * TILE_DIM;
+        t_index width = gridDim.x * TILE_DIM;
         
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
+        for (t_index j = 0; j < TILE_DIM; j += BLOCK_ROWS)
         {
             tile[threadIdx.y+j][threadIdx.x] = idata[(y+j)*width + x];
         }
@@ -965,7 +967,7 @@ int MatrixGpu::m_Allocations = 0;
         x = blockIdx.y * TILE_DIM + threadIdx.x;  // transpose block offset
         y = blockIdx.x * TILE_DIM + threadIdx.y;
         
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
+        for (t_index j = 0; j < TILE_DIM; j += BLOCK_ROWS)
         {
             if((y+j) < inMaxY && width < inMaxX)
             {
@@ -974,7 +976,7 @@ int MatrixGpu::m_Allocations = 0;
         }
     }
 
-    __global__ void getIndexValue(const float *inData, int inIndex, float *outData)
+    __global__ void getIndexValue(const float *inData, t_index inIndex, float *outData)
     {
         *outData = inData[inIndex];
     }
@@ -992,7 +994,7 @@ int MatrixGpu::m_Allocations = 0;
             {
             }
 
-            virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const
+            virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
             {
                 outX = 1;
                 outY = 1;
@@ -1017,33 +1019,32 @@ int MatrixGpu::m_Allocations = 0;
                 }
                 else if(m_Type == EA_AbsMin)
                 {
-                    int resIndex;
+                    //t_index resIndex;
 
-                    cublasIsamin(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
+                    //cublasIsamin(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
 
+                    //getIndexValue<<<1, 1>>>(m_A.getDataConst(), resIndex-1, outMatrix.getData());//-1 because of fortran-style min function
                     //cudaDeviceSynchronize();
                     //cudaThreadSynchronize();
 
-                    getIndexValue<<<1, 1>>>(m_A.getDataConst(), resIndex-1, outMatrix.getData());//-1 because of fortran-style min function
-
-                    //cudaDeviceSynchronize();
-                    //cudaThreadSynchronize();
+                    //not implemented - cublas int* vs i_index* conflict
+                    assert(0);
 
                     //cout << "MIN_INDEX = " << resIndex << endl;
                 }
                 else if(m_Type == EA_AbsMax)
                 {
-                    int resIndex;
+                    //t_index resIndex;
 
-                    cublasIsamax(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
+                    //cublasIsamax(handle, m_A.getX()*m_A.getY(), m_A.getDataConst(), 1, &resIndex);
 
-                    //cudaDeviceSynchronize();
-                    //cudaThreadSynchronize();
-
-                    getIndexValue<<<1, 1>>>(m_A.getDataConst(), resIndex-1, outMatrix.getData());
+                    //getIndexValue<<<1, 1>>>(m_A.getDataConst(), resIndex-1, outMatrix.getData());
 
                     //cudaDeviceSynchronize();
                     //cudaThreadSynchronize();
+
+                    //not implemented - cublas int* vs i_index* conflict
+                    assert(0);
 
                     //cout << "MAX_INDEX = " << resIndex << endl;
                 }
@@ -1060,10 +1061,10 @@ int MatrixGpu::m_Allocations = 0;
             const EAggregate m_Type;
     };
 
-    __global__ void applyFunction(float *outTarget, const float *inSource, int N, EFunctionElementwise inType, float inParam1)
+    __global__ void applyFunction(float *outTarget, const float *inSource, t_index N, EFunctionElementwise inType, float inParam1)
         {
             // target index
-            int tid = blockDim.x * blockIdx.x + threadIdx.x;
+            t_index tid = blockDim.x * blockIdx.x + threadIdx.x;
         
             if (tid < N)
             {
@@ -1135,11 +1136,11 @@ int MatrixGpu::m_Allocations = 0;
             assert (inMatrix.getX() == outMatrix.getX());
             assert (inMatrix.getY() == outMatrix.getY());
 
-            static int ThreadsPerBlock = 512;
+            static t_index ThreadsPerBlock = 512;
 
             dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
 
-            int num = inMatrix.getX()*inMatrix.getY();
+            t_index num = inMatrix.getX()*inMatrix.getY();
 
             dim3 blocksPerGrid((num - 1) / ThreadsPerBlock + 1, 1, 1);
 
@@ -1157,7 +1158,7 @@ int MatrixGpu::m_Allocations = 0;
             {
             }
 
-            virtual void GetResultSize(int &outX, int &outY, bool &outTransposed) const
+            virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
             {
                 outX = m_A.getX();
                 outY = m_A.getY();
@@ -1235,7 +1236,7 @@ int MatrixGpu::m_Allocations = 0;
         }
     MatrixGpu& MatrixGpu::operator=(const OperationGpu &inOperation)
         {
-            int x, y;
+            t_index x, y;
             bool trans;
             inOperation.GetResultSize(x, y, trans);
             Init(x, y, trans);
@@ -1270,7 +1271,7 @@ int MatrixGpu::m_Allocations = 0;
             m_Allocations += 1;
             cout << "m" << m_Allocations;
 #endif
-            int x, y;
+            t_index x, y;
             bool trans;
             inOperation.GetResultSize(x, y, trans);
             Init(x, y, trans);
@@ -1454,17 +1455,17 @@ int MatrixGpu::m_Allocations = 0;
         return OperationMatrixApplyElementwise(*this, EFE_Maximally, inMax);
     }
 
-    __global__ void sample(float *outData, float *inData, float* inRnd, int x, int y, int N)
+    __global__ void sample(float *outData, float *inData, float* inRnd, t_index x, t_index y, t_index N)
     {
         //target row id
-        int rid = blockDim.x * blockIdx.x + threadIdx.x;
+        t_index rid = blockDim.x * blockIdx.x + threadIdx.x;
         
         if (rid < N)
         {
             //random row-id
-            int row = int(inRnd[rid]*x);
+            t_index row = int(inRnd[rid]*x);
 
-            for(int i = 0; i < y; ++i)
+            for(t_index i = 0; i < y; ++i)
             {
                 outData[IDX2C(rid, i, N)] = inData[IDX2C(row, i, x)];
             }
@@ -1472,14 +1473,14 @@ int MatrixGpu::m_Allocations = 0;
         }
     }
 
-    void MatrixGpu::Sample(int inRowsNum, MatrixGpu &outSample) const
+    void MatrixGpu::Sample(t_index inRowsNum, MatrixGpu &outSample) const
     {
         MatrixGpu rnd(inRowsNum, 1);
         rnd.RandUniform();
 
         outSample.Reset(inRowsNum, getY());
 
-        static int ThreadsPerBlock = 256;
+        static t_index ThreadsPerBlock = 256;
 
         dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
 
@@ -1497,8 +1498,8 @@ int MatrixGpu::m_Allocations = 0;
 
             if(isTrans())
             {
-                int x = getX();
-                int y = getY();
+                t_index x = getX();
+                t_index y = getY();
 
                 //transpose
                 Init(y, x, false);
@@ -1534,61 +1535,94 @@ int MatrixGpu::m_Allocations = 0;
         return *this;
     }
 
+    void printProgress(int act, int max)
+    {
+        //if(act > 1)
+        //{
+        //    if((100*(act-1))/max < (100*act)/max)
+        //    {
+        //        std::cout << " " << ((100*act)/max) << "%" << "\r" << std::flush;
+        //    }
+        //}
+        if(act % 100 == 0)
+        {
+            std::cout << " " << std::setprecision(2) << std::fixed << (float(100*act)/max) << "%" << "\r" << std::scientific << std::flush;
+        }
+    }
+
     std::istream &MatrixCpu::Load(std::istream &inStream, bool inTransposed)
     {
         std::string header;
         std::getline(inStream, header, '\n');
         //std::cout << "HEADER: [" << header << "]" << std::endl;
     
-        const int lm = 6; //len(Matrix)
+        const t_index lm = 6; //len(Matrix)
     
         if(header.substr(0, lm) == "Matrix")
         {
             std::stringstream hs(header.substr(lm, header.size() - 6));
     
-            int version = -1;
+            t_index version = 0;
             hs >> version;
     
             if(version == 1)//images ~ binary saved bytes => divide each value by 255
             {
                 std::getline(inStream, header, '\n');
                 std::stringstream hs(header);
-                int x, y;
+                t_index x, y;
                 hs >> x >> y;
     
-                assert (x >= 0 && y >= 0);
+                //assert (x >= 0 && y >= 0);
     
-                //int sizeOfSavedInt = 4;
+                //t_index sizeOfSavedt_index = 4;
                 //assert(sizeof(int) == sizeOfSavedInt);
     
                 //inStream.read((char*)&x, sizeOfSavedInt);
                 //inStream.read((char*)&y, sizeOfSavedInt);
     
-                //std::cout << "x=" << x << ", y=" << y << std::endl;
+                std::cout << "x=" << x << ", y=" << y << std::endl;
     
                 uint8_t d[y];
     
+#define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
                 if(!inTransposed)
                 {
                     Reset(x, y);
-                    for(int i = 0; i < x; ++i)
+
+                    for(t_index i = 0; i < x; ++i)
                     {
                         inStream.read((char*)d, y);
     
-                        for(int j = 0; j < y; ++j)
+                        for(t_index j = 0; j < y; ++j)
                         {
+                            //float dd = d[j]/255.0f;
+                            //t_index idx = IDX2C(i, j, x);
+                            //t_index mmax = x*y;
+                            //if(idx >= mmax)
+                            //{
+                            //    //std::cout << "max int: " << numeric_limits<int>::max() << std::endl;
+                            //    //std::cout << "max long: " << numeric_limits<long>::max() << std::endl;
+                            //    //std::cout << "max ulong: " << numeric_limits<unsigned long>::max() << std::endl;
+                            //    std::cout << "(" << (idx >= mmax) << ") " << idx << " >= " << x << " x " << y << " = " << mmax << ", ixj= " << i << " x " << j << std::endl;
+                            //    assert(0);
+                            //}
+
+                            //m_Data[idx] = dd;
                             m_Data[IDX2C(i, j, x)] = d[j]/255.0f;
                         }
+
+                        printProgress(i, x);
                     }
                 }
                 else
                 {
                     Reset(y, x);
-                    for(int i = 0; i < x; ++i)
+                    for(t_index i = 0; i < x; ++i)
                     {
                         inStream.read((char*)d, y);
     
-                        for(int j = 0; j < y; ++j)
+                        for(t_index j = 0; j < y; ++j)
                         {
                             m_Data[IDX2C(j, i, y)] = d[j]/255.0f;
                         }
@@ -1599,12 +1633,12 @@ int MatrixGpu::m_Allocations = 0;
             {
                 std::getline(inStream, header, '\n');
                 std::stringstream hs(header);
-                int x, y;
+                t_index x, y;
                 hs >> x >> y;
     
-                assert (x >= 0 && y >= 0);
+                //assert (x >= 0 && y >= 0);
 
-                //int sizeOfSavedInt = 4;
+                //t_index sizeOfSavedt_index = 4;
                 //assert(sizeof(int) == sizeOfSavedInt);
     
                 //inStream.read((char*)&x, sizeOfSavedInt);
@@ -1614,67 +1648,71 @@ int MatrixGpu::m_Allocations = 0;
     
                 float d[y];
     
-                int sizeOfSavedFloat = 4;
+                t_index sizeOfSavedFloat = 4;
                 assert(sizeof(float) == sizeOfSavedFloat);
     
                 if(!inTransposed)
                 {
                     Reset(x, y);
-                    for(int i = 0; i < x; ++i)
+                    for(t_index i = 0; i < x; ++i)
                     {
                         inStream.read((char*)d, y*sizeOfSavedFloat);
     
-                        for(int j = 0; j < y; ++j)
+                        for(t_index j = 0; j < y; ++j)
                         {
                             m_Data[IDX2C(i, j, x)] = d[j];
                         }
+                        printProgress(i, x);
                     }
                 }
                 else
                 {
                     Reset(y, x);
-                    for(int i = 0; i < x; ++i)
+                    for(t_index i = 0; i < x; ++i)
                     {
                         inStream.read((char*)d, y*sizeOfSavedFloat);
     
-                        for(int j = 0; j < y; ++j)
+                        for(t_index j = 0; j < y; ++j)
                         {
                             m_Data[IDX2C(j, i, y)] = d[j];
                         }
+                        printProgress(i, x);
                     }
                 }
             }
         }
         else//oldest-version
         {
-            int x, y;
+            t_index x, y;
             std::stringstream hs(header);
             hs >> x >> y;
     
-            assert (x >= 0 && y >= 0);
+            //assert (x >= 0 && y >= 0);
     
             //cout << "x:" << x << "\ny:" << y << std::endl;
     
             if(!inTransposed)
             {
                 Reset(x, y);
-                for(int i = 0; i < x; ++i)
+                for(t_index i = 0; i < x; ++i)
                 {
-                    for(int j = 0; j < y; ++j)
+                    for(t_index j = 0; j < y; ++j)
                     {
                         inStream >> m_Data[IDX2C(i, j, x)];
                     }
+                    printProgress(i, x);
                 }
             }
             else
             {
                 Reset(y, x);
-                for(int i = 0; i < x; ++i)
+                for(t_index i = 0; i < x; ++i)
                 {
-                    for(int j = 0; j < y; ++j)
+                    for(t_index j = 0; j < y; ++j)
                     {
                         inStream >> m_Data[IDX2C(j, i, y)];
                     }
+                    printProgress(i, x);
                 }
             }
         }
@@ -1683,7 +1721,7 @@ int MatrixGpu::m_Allocations = 0;
         return inStream;
     }
     
-    std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, int expectedRows, int expectedCols, int version)
+    std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version)
     {
         if(version == 0)
         {
@@ -1720,14 +1758,14 @@ int MatrixGpu::m_Allocations = 0;
 
         if(version == 0)
         {
-            for(int i = 0; i < m_X; ++i)
+            for(t_index i = 0; i < m_X; ++i)
             {
                 if(m_Y > 0)
                 {
                     outStream << m_Data[IDX2C(i, 0, m_X)];
                 }
     
-                for(int j = 1; j < m_Y; ++j)
+                for(t_index j = 1; j < m_Y; ++j)
                 {
                     outStream << " " << m_Data[IDX2C(i, j, m_X)];
                 }
@@ -1744,19 +1782,19 @@ int MatrixGpu::m_Allocations = 0;
         }
         else if(version == 2)
         {
-            //int sizeOfSavedInt = 4, x = m_X, y = m_Y;
+            //t_index sizeOfSavedt_index = 4, x = m_X, y = m_Y;
             //assert(sizeof(int) == sizeOfSavedInt);
 
             //outStream.write((char*)&x, sizeOfSavedInt);
             //outStream.write((char*)&y, sizeOfSavedInt);
 
-            int sizeOfSavedFloat = 4;
+            t_index sizeOfSavedFloat = 4;
             assert(sizeof(float) == sizeOfSavedFloat);
             float d[m_Y];
 
-            for(int i = 0; i < m_X; ++i)
+            for(t_index i = 0; i < m_X; ++i)
             {
-                for(int j = 0; j < m_Y; ++j)
+                for(t_index j = 0; j < m_Y; ++j)
                 {
                     d[j] = m_Data[IDX2C(i, j, m_X)];
                 }
@@ -1776,7 +1814,7 @@ int MatrixGpu::m_Allocations = 0;
         if(0)//raw data
         {
             outStream << "raw:";
-            for(int j = 0; j < m_Y*m_Y; ++j)
+            for(t_index j = 0; j < m_Y*m_Y; ++j)
             {
                 outStream << " " << m_Data[j];
             }

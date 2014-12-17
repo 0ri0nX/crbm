@@ -14,6 +14,7 @@ using namespace std;
 #include "utils.h"
 #include "crbm.h"
 
+using namespace YAMATH;
 typedef MatrixGpu Mat;
 
 CRBM::CRBMLayer *abc = NULL;

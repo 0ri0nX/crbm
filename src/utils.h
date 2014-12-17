@@ -61,12 +61,12 @@ void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM)
     msgC(inMsg, x);
 }
 
-void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false)
+void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false, const std::string &inCacheFileName = "")
 {
     std::cout << "loading [" << filename << "] ... " << std::flush;
     Timer t;
     std::ifstream f(filename.c_str());
-    inM.Load(f, inTransposed);
+    inM.Load(f, inTransposed, inCacheFileName);
     f.close();
     std::cout << inM.getX() << " x " << inM.getY() << "  ";
     t.tac();

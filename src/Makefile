@@ -4,14 +4,17 @@ all: crbm crbmOld
 %.o: %.cu matrix.h Makefile utils.h crbm.h
 	nvcc --gpu-architecture=sm_35  -c -o $@ -O3 -D CUDA -g $<
 
+%.o: %.cpp
+	g++ -std=c++0x -c -o $@ -O3 -g $<
+
 test: test.cu matrix.h
 	nvcc -o test -D CUDA test.cu -lcublas -lcurand -D DEBUG
 
-crbm: matrix.h utils.h crbm.h crbm.o Makefile utils.h
-	nvcc --gpu-architecture=sm_35 -o crbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbm.o -g
+crbm: matrix.h utils.h crbm.h crbm.o Makefile utils.h matrixCpu.o
+	nvcc --gpu-architecture=sm_35 -o crbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbm.o matrixCpu.o -g
 
-crbmCompute: matrix.h utils.h crbm.h crbmCompute.o Makefile utils.h
-	nvcc -Xcompiler "-std=c++0x" --gpu-architecture=sm_35 -o crbmCompute -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbmCompute.o -g
+crbmCompute: matrix.h utils.h crbm.h crbmCompute.o Makefile utils.h matrixCpu.o
+	nvcc -Xcompiler "-std=c++0x" --gpu-architecture=sm_35 -o crbmCompute -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbmCompute.o matrixCpu.o -g
 
 crbmOld: matrix.h utils.h crbm.h crbmOld.o Makefile utils.h
 	nvcc --gpu-architecture=sm_35 -o crbmOld -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbmOld.o -g

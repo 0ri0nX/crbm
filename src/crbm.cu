@@ -92,7 +92,7 @@ int main(int argc, char** argv)
     }
 
     MatrixCpu x;
-    loadMatrix(x, argv[3]);
+    loadMatrix(x, argv[3], false);//, string(argv[3]) + ".cache");
 
     timer.tic();
     abc->LearnAll(x, string(argv[3]) + ".rbm");

@@ -62,7 +62,7 @@ int main(int argc, char** argv)
 
     MatrixCpu *xCpu = new MatrixCpu();
 
-    loadMatrix(*xCpu, argv[3]);
+    loadMatrix(*xCpu, argv[3]);//, false, string(argv[3]) + ".cache");
 
     int rows = xCpu->getX();
     int cols = xCpu->getY();

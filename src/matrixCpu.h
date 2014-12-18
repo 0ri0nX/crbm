@@ -20,7 +20,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-
 namespace YAMATH
 {
     typedef unsigned long t_index;
@@ -108,9 +107,12 @@ namespace YAMATH
                     }
                 }
             }
+
+            //samples rows - not effective
             void Sample(t_index inRowsNum, MatrixCpu &outSample) const;
 
-            void SampleY(t_index inColsNum, MatrixCpu &outSample) const;
+            //sampls columns - effective
+            void SampleCols(t_index inColsNum, MatrixCpu &outSample) const;
 
             void AllocateMemory(t_index inDataSize, const std::string &inCacheFileName)
             {
@@ -119,7 +121,7 @@ namespace YAMATH
                 if(m_CacheFileName != "")
                 {
                     t_index size = inDataSize*sizeof(float);
-                    std::cout << "step 1" << std::endl;
+                    //std::cout << "step 1" << std::endl;
 
                     m_FileCache = open(m_CacheFileName.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
                     if (m_FileCache == -1)
@@ -127,7 +129,7 @@ namespace YAMATH
                         throw std::runtime_error("Error opening file for writing");
                     }
 
-                    std::cout << "step 2" << std::endl;
+                    //std::cout << "step 2" << std::endl;
                     // Stretch the file size to the size of the (mmapped) array of ints
                     int result = lseek(m_FileCache, size-1, SEEK_SET);
                     if (result == -1)
@@ -136,7 +138,7 @@ namespace YAMATH
                         throw std::runtime_error("Error calling lseek() to 'stretch' the file");
                     }
 
-                    std::cout << "step 3" << std::endl;
+                    //std::cout << "step 3" << std::endl;
                     result = write(m_FileCache, "", 1);
                     if (result != 1)
                     {
@@ -144,7 +146,7 @@ namespace YAMATH
                         throw std::runtime_error("Error writing last byte of the file");
                     }
 
-                    std::cout << "step 4" << std::endl;
+                    //std::cout << "step 4" << std::endl;
                     m_Data = (float*)mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, m_FileCache, 0);
 
                     madvise(m_Data, size, MADV_RANDOM);
@@ -154,7 +156,7 @@ namespace YAMATH
                         close(m_FileCache);
                         throw std::runtime_error("Error mmapping the file");
                     }
-                    std::cout << "step 5" << std::endl;
+                    //std::cout << "step 5" << std::endl;
                 }
                 else
                 {
@@ -229,6 +231,10 @@ namespace YAMATH
     };
 
 }
+void msgC(const char * inMsg, const YAMATH::MatrixCpu &x);
+
+
+
 
 #endif //MATRIX_H
 

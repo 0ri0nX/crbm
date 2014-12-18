@@ -24,6 +24,8 @@
 
 #include "matrixCpu.h"
 
+void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM);
+
 namespace YAMATH
 {
     typedef unsigned long t_index;
@@ -350,7 +352,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
             void Reset(t_index inX, t_index inY, bool inTransposed = false)
             {
-                if(m_X*m_Y != inX*inY)
+                if(m_X*m_Y != inX*inY || m_ShallowCopy)
                 {
                     m_Data = 0;
 
@@ -359,6 +361,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 else
                 {
                     m_Transposed = inTransposed;
+                    m_ShallowCopy = false;
+                    m_X = inX;
+                    m_Y = inY;
                 }
             }
 
@@ -788,7 +793,7 @@ int MatrixGpu::m_Allocations = 0;
 
     void transpose(float *outData, const float *inData, t_index inSourceX, t_index inSourceY)
         {
-            static t_index ThreadsPerBlock = 96; //shared memory need to be at least sizeof(float) * ThreadsPerBlock^2
+            static t_index ThreadsPerBlock = 32; //shared memory need to be at least sizeof(float) * ThreadsPerBlock^2
 
             t_index sx = min(ThreadsPerBlock, inSourceX);
             t_index sy = min(ThreadsPerBlock, inSourceY);
@@ -800,7 +805,15 @@ int MatrixGpu::m_Allocations = 0;
                     , (inSourceY - 1) / sy + 1
                     , 1);
 
+            //std::cout << std::endl;
+            //std::cout << "x = " << inSourceX << ", y = " << inSourceY << std::endl;
+            //std::cout << "tpb: " << threadsPerBlock.x << " x " << threadsPerBlock.y << " x " << threadsPerBlock.z << std::endl;
+            //std::cout << "bpg: " << blocksPerGrid.x << " x " << blocksPerGrid.y << " x " << blocksPerGrid.z << std::endl;
+
+            //std::cout << std::endl;
+
             transposeSimple<<<blocksPerGrid, threadsPerBlock, sx*sy*sizeof(float)>>>(outData, inData, inSourceX, inSourceY);
+
             gpuErrchk( cudaPeekAtLastError() );
             gpuErrchk( cudaDeviceSynchronize() );
         }

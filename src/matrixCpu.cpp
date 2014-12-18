@@ -55,41 +55,49 @@ namespace YAMATH
 
         return *this;
     }
-            void MatrixCpu::Sample(t_index inRowsNum, MatrixCpu &outSample) const
+
+    void MatrixCpu::Sample(t_index inRowsNum, MatrixCpu &outSample) const
+    {
+        outSample.Reset(inRowsNum, getY());
+
+        std::random_device randomDevice;
+        std::uniform_int_distribution<int> dist(0, getX()-1);
+
+        for(t_index i = 0; i < inRowsNum; ++i)
+        {
+            t_index randomRow = dist(randomDevice);
+
+            for(t_index j = 0; j < getY(); ++j)
             {
-                outSample.Reset(inRowsNum, getY());
-
-                std::random_device randomDevice;
-                std::uniform_int_distribution<int> dist(0, getX()-1);
-
-                for(t_index i = 0; i < inRowsNum; ++i)
-                {
-                    t_index randomRow = dist(randomDevice);
-
-                    for(t_index j = 0; j < getY(); ++j)
-                    {
-                        outSample.set(i, j, get(randomRow, j));
-                    }
-                }
+                outSample.set(i, j, get(randomRow, j));
             }
+        }
+    }
 
-            void MatrixCpu::SampleY(t_index inColsNum, MatrixCpu &outSample) const
+    void MatrixCpu::SampleCols(t_index inColsNum, MatrixCpu &outSample) const
+    {
+        t_index randomCol[inColsNum];
+
+        outSample.Reset(getX(), inColsNum);
+
+        std::random_device randomDevice;
+        std::uniform_int_distribution<int> dist(0, getY()-1);
+
+        for(t_index i = 0; i < inColsNum; ++i)
+        {
+            randomCol[i] = dist(randomDevice);
+            if(m_CacheFileName != "")
             {
-                outSample.Reset(getX(), inColsNum);
-
-                std::random_device randomDevice;
-                std::uniform_int_distribution<int> dist(0, getY()-1);
-
-                for(t_index i = 0; i < inColsNum; ++i)
-                {
-                    t_index randomCol = dist(randomDevice);
-
-                    for(t_index j = 0; j < getX(); ++j)
-                    {
-                        outSample.set(j, i, get(i, randomCol));
-                    }
-                }
+                //madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_WILLNEED | MADV_SEQUENTIAL);
+                madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_WILLNEED);
             }
+        }
+
+        for(t_index i = 0; i < inColsNum; ++i)
+        {
+            memcpy(outSample.getData() + i*getX(), getDataConst() + randomCol[i]*getX(), getX()*sizeof(float));
+        }
+    }
 
     void printProgress(int act, int max)
     {
@@ -381,6 +389,26 @@ namespace YAMATH
         return outStream;
     }
 
+}
+
+void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)
+{
+    int n = x.getX()*x.getY();
+    if(n > 400)
+    {
+        std::cout << inMsg << ": " << x.getX() << " x " << x.getY()
+             << "[ " << (x.getDataConst()[0]) << ", " << (x.getDataConst()[1]) << " ... " << (x.getDataConst()[n-2]) << ", " << (x.getDataConst()[n-1]) << " ]" << std::endl;
+    }
+    else if(n == 1)
+    {
+        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":[" << x.getDataConst()[0] << "]" << std::flush;
+    }
+    else
+    {
+        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":" << std::endl;
+        x.Save(std::cout);
+        std::cout << std::endl;
+    }
 }
 
 

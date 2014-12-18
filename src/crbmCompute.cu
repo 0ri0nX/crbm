@@ -62,10 +62,11 @@ int main(int argc, char** argv)
 
     MatrixCpu *xCpu = new MatrixCpu();
 
-    loadMatrix(*xCpu, argv[3]);//, false, string(argv[3]) + ".cache");
+    loadMatrix(*xCpu, argv[3], true, string(argv[3]) + ".cache");
 
-    int rows = xCpu->getX();
-    int cols = xCpu->getY();
+    //transposition
+    int cols = xCpu->getX();
+    int rows = xCpu->getY();
 
     int batchNum = (rows - 1) / batchSize + 1;
 
@@ -105,7 +106,7 @@ int main(int argc, char** argv)
     MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
     //f << rows << " " << resSize << endl;
 
-    Mat xx;
+    Mat xx, xxTrans;
     MatrixCpu tmpxx;
     Timer timer;
 
@@ -117,21 +118,18 @@ int main(int argc, char** argv)
         cout << batch+1 << " / " << batchNum << endl;
 
         timer.tic();
-        xx = xCpu->SubMatrix(a, 0, b, cols);
+
+        //xx = xCpu->SubMatrix(a, 0, b, cols);
+
+        xx = xCpu->SubMatrix(0, a, cols, b);
+
+        //transposition needed
+        xx.Transpose();
+        xx.MakeHardCopy();
+
         timer.tac("   selected: ");
 
-        //msgG("loaded", xx);
-
         Mat y;
-        //msgG("xx", xx);
-        //layers[0]->Convolve(xx, y);
-        //saveMatrix(y, string(argv[3]) + ".conv");
-        //msgG("conv(xx)", y);
-        //layers[0]->DeConvolve(y, xx);
-        //saveMatrix(xx, string(argv[3]) + ".convDeconv");
-        //msgG("deconv(conv(xx))", xx);
-
-        //exit(1);
 
         for(int i = 0; i < layers.size(); ++i)
         {

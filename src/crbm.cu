@@ -92,10 +92,11 @@ int main(int argc, char** argv)
     }
 
     MatrixCpu x;
-    loadMatrix(x, argv[3], false);//, string(argv[3]) + ".cache");
+    //matrix is transposed!!! => pictures are saved one after another - like in the file
+    loadMatrix(x, argv[3], true, string(argv[3]) + ".cache");
 
     timer.tic();
-    abc->LearnAll(x, string(argv[3]) + ".rbm");
+    abc->LearnAll(x, string(argv[3]) + ".rbm", true);
     timer.tac("learning duration: ");
 
     if(abc->IsStopRequired())

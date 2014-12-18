@@ -35,26 +35,6 @@ class Timer
 };
 
 
-void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)
-{
-    int n = x.getX()*x.getY();
-    if(n > 400)
-    {
-        std::cout << inMsg << ": " << x.getX() << " x " << x.getY()
-             << "[ " << (x.getDataConst()[0]) << ", " << (x.getDataConst()[1]) << " ... " << (x.getDataConst()[n-2]) << ", " << (x.getDataConst()[n-1]) << " ]" << std::endl;
-    }
-    else if(n == 1)
-    {
-        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":[" << x.getDataConst()[0] << "]" << std::flush;
-    }
-    else
-    {
-        std::cout  << inMsg << ": " << x.getX() << " x " << x.getY() << ":" << std::endl;
-        x.Save(std::cout);
-        std::cout << std::endl;
-    }
-}
-
 void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM)
 {
     YAMATH::MatrixCpu x = inM;

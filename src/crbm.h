@@ -125,7 +125,7 @@ namespace CRBM
             float LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName = "");
 
             //main data matrix is in CPU memory
-            float LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName = "");
+            float LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName = "", bool inputTransposed = false);
 
             float LearnBatch(const YAMATH::MatrixGpu &inBatch);
             void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
@@ -616,7 +616,7 @@ namespace CRBM
         return rr.getDataConst()[0]/(inW.getX()*inW.getY());
     }
 
-    float CRBMLayer::LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName)
+    float CRBMLayer::LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName, bool inputTransposed)
     {
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
@@ -632,8 +632,22 @@ namespace CRBM
         {
             Timer t;
             std::cout << i << " / " << s().iterations << " sampling ... " << std::flush;
-            inData.Sample(s().batchSize, batchCpu);
-            batch = batchCpu;
+
+            if(inputTransposed)
+            {
+                inData.SampleCols(s().batchSize, batchCpu);
+
+                //transposition needed
+                batch = batchCpu;
+                batch.Transpose();
+                batch.MakeHardCopy();
+            }
+            else
+            {
+                inData.Sample(s().batchSize, batchCpu);
+                batch = batchCpu;
+            }
+
             t.tac();
 
             error = LearnBatch(batch);

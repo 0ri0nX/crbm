@@ -42,6 +42,8 @@ namespace CRBM
 
             activationFunctionH = 0;
             activationFunctionV = 0;
+
+            momentum = 0.0f;
     
             //momentum = 0.9f;
             //dataLimit = 0;
@@ -78,6 +80,7 @@ namespace CRBM
             incrementalSaveStart            = loadOption(f, "incrementalSaveStart",                     incrementalSaveStart);
             activationFunctionH             = loadOption(f, "activationFunctionH",                      activationFunctionH);
             activationFunctionV             = loadOption(f, "activationFunctionV",                      activationFunctionV);
+            momentum        = loadOption(f, "momentum",                     momentum);
         }
     
         //image-size
@@ -108,6 +111,8 @@ namespace CRBM
         int saveInterval;
         int incrementalSaveStart;
         int incrementalSave;
+
+        float momentum;
     };
 
 
@@ -127,7 +132,7 @@ namespace CRBM
             //main data matrix is in CPU memory
             float LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName = "", bool inputTransposed = false);
 
-            float LearnBatch(const YAMATH::MatrixGpu &inBatch);
+            float LearnBatch(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &inOutLastWeights);
             void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
             void Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
     
@@ -628,6 +633,10 @@ namespace CRBM
         float error = -1;
         YAMATH::MatrixCpu batchCpu;
         YAMATH::MatrixGpu batch;
+
+        YAMATH::MatrixGpu lastWeights(m_Weights.getX(), m_Weights.getY());
+        lastWeights = 0.0f;
+
         for(int i = 1; i <= s().iterations && !IsStopRequired(); ++i)
         {
             Timer t;
@@ -650,7 +659,7 @@ namespace CRBM
 
             t.tac();
 
-            error = LearnBatch(batch);
+            error = LearnBatch(batch, lastWeights);
 
             if(i % s().saveInterval == 0 && inBackupFileName != "")
             {
@@ -682,6 +691,10 @@ namespace CRBM
 
         float error = -1;
         YAMATH::MatrixGpu batch;
+
+        YAMATH::MatrixGpu lastWeights(m_Weights.getX(), m_Weights.getY());
+        lastWeights = 0.0f;
+
         for(int i = 1; i <= s().iterations && !IsStopRequired(); ++i)
         {
             Timer t;
@@ -689,7 +702,7 @@ namespace CRBM
             inData.Sample(s().batchSize, batch);
             t.tac();
 
-            error = LearnBatch(batch);
+            error = LearnBatch(batch, lastWeights);
 
             if(i % s().saveInterval == 0 && inBackupFileName != "")
             {
@@ -700,7 +713,7 @@ namespace CRBM
         return error;
     }
 
-    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch)
+    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &inOutLastWeights)
     {
         Timer timer;
 
@@ -746,6 +759,15 @@ namespace CRBM
 
             m_Weights += dw1;
             m_Weights -= dw2;
+
+            if(s().momentum > 0.0f)
+            {
+                inOutLastWeights *= s().momentum;
+                m_Weights *= (1.0f - s().momentum);
+
+                m_Weights += inOutLastWeights;
+                inOutLastWeights = m_Weights;
+            }
 
             if(i % s().logModulo == 0 || i == s().batchIterations || i == 1)
             {
@@ -904,7 +926,9 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        sv(out, "CRBMLayer", 5);
+        int version = 6;
+
+        sv(out, "CRBMLayer", version);
 
         //1
         sv(out, "learningSpeed", s().learningRate);
@@ -934,12 +958,19 @@ namespace CRBM
         sv(out, "saveInterval", s().saveInterval);
         sv(out, "incrementalSave", s().incrementalSave);
         sv(out, "incrementalSaveStart", s().incrementalSaveStart);
+
+        //5 matrix versioning
+
+        //6
+        sv(out, "momentum", s().momentum);
     }
 
     void CRBMLayer::Load(std::istream &in)
     {
         int version = -1;
-        lvc(in, "CRBMLayer", 1, 5, version);
+        int minVersion = 1;
+        int maxVersion = 6;
+        lvc(in, "CRBMLayer", minVersion, maxVersion, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
 
@@ -975,6 +1006,11 @@ namespace CRBM
             lv(in, "incrementalSaveStart", m_Setting.incrementalSaveStart);
         }
         //5 - matrix version
+        //
+        if(version >= 6)
+        {
+            lv(in, "momentum", m_Setting.momentum);
+        }
     }
 
     void CRBMLayer::Save(const std::string &inName) const

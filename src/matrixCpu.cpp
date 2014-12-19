@@ -88,7 +88,6 @@ namespace YAMATH
             randomCol[i] = dist(randomDevice);
             if(m_CacheFileName != "")
             {
-                //madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_WILLNEED | MADV_SEQUENTIAL);
                 madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_WILLNEED);
             }
         }
@@ -96,6 +95,11 @@ namespace YAMATH
         for(t_index i = 0; i < inColsNum; ++i)
         {
             memcpy(outSample.getData() + i*getX(), getDataConst() + randomCol[i]*getX(), getX()*sizeof(float));
+
+            if(m_CacheFileName != "")
+            {
+                madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_NORMAL);
+            }
         }
     }
 
@@ -136,14 +140,6 @@ namespace YAMATH
                 t_index x, y;
                 hs >> x >> y;
     
-                //assert (x >= 0 && y >= 0);
-    
-                //t_index sizeOfSavedt_index = 4;
-                //assert(sizeof(int) == sizeOfSavedInt);
-    
-                //inStream.read((char*)&x, sizeOfSavedInt);
-                //inStream.read((char*)&y, sizeOfSavedInt);
-    
                 std::cout << "x=" << x << ", y=" << y << std::endl;
     
                 uint8_t d[y];
@@ -160,19 +156,6 @@ namespace YAMATH
     
                         for(t_index j = 0; j < y; ++j)
                         {
-                            //float dd = d[j]/255.0f;
-                            //t_index idx = IDX2C(i, j, x);
-                            //t_index mmax = x*y;
-                            //if(idx >= mmax)
-                            //{
-                            //    //std::cout << "max int: " << numeric_limits<int>::max() << std::endl;
-                            //    //std::cout << "max long: " << numeric_limits<long>::max() << std::endl;
-                            //    //std::cout << "max ulong: " << numeric_limits<unsigned long>::max() << std::endl;
-                            //    std::cout << "(" << (idx >= mmax) << ") " << idx << " >= " << x << " x " << y << " = " << mmax << ", ixj= " << i << " x " << j << std::endl;
-                            //    assert(0);
-                            //}
-
-                            //m_Data[idx] = dd;
                             m_Data[IDX2C(i, j, x)] = d[j]/255.0f;
                         }
 

@@ -100,8 +100,11 @@ def makeImage(filename, targetFilename):
     order = list(sorted(order, key = lambda x: x[0]))
 
     for i in xrange(min(limit, m.shape[0])):
-    
-        r = m[order[i][1]]
+   
+        if False:
+            r = m[order[i][1]]
+        else:
+            r = m[i]
     
         if rescale:
             mi = np.min(r)
@@ -136,12 +139,14 @@ for i in sys.argv[2:]:
     try:
         n = int(i.strip().rsplit(".", 1)[1])
     except:
-        raise
+        n = 0
+
     fn = sys.argv[1] + "." + str(n).zfill(5) + ".jpg"
 
     try:
         makeImage(i.strip(), fn)
     except:
         print "error"
+        raise
 
 

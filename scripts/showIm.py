@@ -5,14 +5,22 @@ import numpy as np
 import sys
 
 size = (200, 200)
+limit = 10
 #size = (10, 10)
 #size = (39, 39)
+
+if len(sys.argv) not in [2,3]:
+    print sys.argv[0], "<image-matrix> [limit=" + str(limit) + "]"
+    print "\texpecting image-size", size
+    exit(1)
+
+if len(sys.argv) == 3:
+    limit = int(sys.argv[2])
 
 f = open(sys.argv[1])
 
 f.next()
 
-limit = 10
 
 for j in f:
     limit -= 1

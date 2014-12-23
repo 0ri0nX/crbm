@@ -37,52 +37,43 @@ namespace YAMATH
             Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
         }
 
-    /*MatrixCpu &MatrixCpu::operator=(const MatrixGpu &inMatrix)
-    {
-        Reset(inMatrix.getX(), inMatrix.getY());
-        assert(!inMatrix.isTrans());
-        cudaMemcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToHost);
-
-        return *this;
-    }*/
-
     MatrixCpu &MatrixCpu::operator=(const MatrixCpu &inMatrix)
     {
         if(this != &inMatrix)
         {
             Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
         }
-
+  
         return *this;
     }
-
+  
     void MatrixCpu::Sample(t_index inRowsNum, MatrixCpu &outSample) const
     {
         outSample.Reset(inRowsNum, getY());
-
+  
         std::random_device randomDevice;
         std::uniform_int_distribution<int> dist(0, getX()-1);
-
+  
         for(t_index i = 0; i < inRowsNum; ++i)
         {
             t_index randomRow = dist(randomDevice);
-
+  
             for(t_index j = 0; j < getY(); ++j)
             {
                 outSample.set(i, j, get(randomRow, j));
             }
         }
     }
-
+  
     void MatrixCpu::SampleCols(t_index inColsNum, MatrixCpu &outSample) const
     {
         t_index randomCol[inColsNum];
-
+  
         outSample.Reset(getX(), inColsNum);
-
+  
         std::random_device randomDevice;
         std::uniform_int_distribution<int> dist(0, getY()-1);
-
+  
         for(t_index i = 0; i < inColsNum; ++i)
         {
             randomCol[i] = dist(randomDevice);
@@ -91,11 +82,11 @@ namespace YAMATH
                 madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_WILLNEED);
             }
         }
-
+  
         for(t_index i = 0; i < inColsNum; ++i)
         {
             memcpy(outSample.getData() + i*getX(), getDataConst() + randomCol[i]*getX(), getX()*sizeof(float));
-
+  
             if(m_CacheFileName != "")
             {
                 madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_NORMAL);
@@ -118,127 +109,48 @@ namespace YAMATH
         }
     }
 
-    std::istream &MatrixCpu::Load(std::istream &inStream, bool inTransposed, const std::string &inCacheFileName)
+    std::istream &MatrixCpu::LoadHeader(std::istream &inStream, int &outVersion, t_index &outX, t_index &outY)
     {
         std::string header;
         std::getline(inStream, header, '\n');
-        //std::cout << "HEADER: [" << header << "]" << std::endl;
     
-        const t_index lm = 6; //len(Matrix)
+        const t_index lm = 6; //len("Matrix")
     
         if(header.substr(0, lm) == "Matrix")
         {
-            std::stringstream hs(header.substr(lm, header.size() - 6));
+            std::stringstream hs(header.substr(lm, header.size() - lm));
     
-            t_index version = 0;
-            hs >> version;
-    
-            if(version == 1)//images ~ binary saved bytes => divide each value by 255
+            hs >> outVersion;
+            if(outVersion == 1)//images ~ binary saved bytes => divide each value by 255
             {
                 std::getline(inStream, header, '\n');
                 std::stringstream hs(header);
-                t_index x, y;
-                hs >> x >> y;
+                hs >> outX >> outY;
     
-                std::cout << "x=" << x << ", y=" << y << std::endl;
-    
-                uint8_t d[y];
-    
-#define IDX2C(i,j,ld) (((j)*(ld))+(i))
-
-                if(!inTransposed)
-                {
-                    Reset(x, y, NULL, inCacheFileName);
-
-                    for(t_index i = 0; i < x; ++i)
-                    {
-                        inStream.read((char*)d, y);
-    
-                        for(t_index j = 0; j < y; ++j)
-                        {
-                            m_Data[IDX2C(i, j, x)] = d[j]/255.0f;
-                        }
-
-                        printProgress(i, x);
-                    }
-                }
-                else
-                {
-                    Reset(y, x, NULL, inCacheFileName);
-                    for(t_index i = 0; i < x; ++i)
-                    {
-                        inStream.read((char*)d, y);
-    
-                        for(t_index j = 0; j < y; ++j)
-                        {
-                            m_Data[IDX2C(j, i, y)] = d[j]/255.0f;
-                        }
-                        printProgress(i, x);
-                    }
-                }
             }
-            else if (version == 2)//binary saved floats
+            else if (outVersion == 2)//binary saved floats
             {
                 std::getline(inStream, header, '\n');
                 std::stringstream hs(header);
-                t_index x, y;
-                hs >> x >> y;
-    
-                //assert (x >= 0 && y >= 0);
-
-                //t_index sizeOfSavedt_index = 4;
-                //assert(sizeof(int) == sizeOfSavedInt);
-    
-                //inStream.read((char*)&x, sizeOfSavedInt);
-                //inStream.read((char*)&y, sizeOfSavedInt);
-    
-                //std::cout << "x=" << x << ", y=" << y << std::endl;
-    
-                float d[y];
-    
-                t_index sizeOfSavedFloat = 4;
-                assert(sizeof(float) == sizeOfSavedFloat);
-    
-                if(!inTransposed)
-                {
-                    Reset(x, y, NULL, inCacheFileName);
-                    for(t_index i = 0; i < x; ++i)
-                    {
-                        inStream.read((char*)d, y*sizeOfSavedFloat);
-    
-                        for(t_index j = 0; j < y; ++j)
-                        {
-                            m_Data[IDX2C(i, j, x)] = d[j];
-                        }
-                        printProgress(i, x);
-                    }
-                }
-                else
-                {
-                    Reset(y, x, NULL, inCacheFileName);
-                    for(t_index i = 0; i < x; ++i)
-                    {
-                        inStream.read((char*)d, y*sizeOfSavedFloat);
-    
-                        for(t_index j = 0; j < y; ++j)
-                        {
-                            m_Data[IDX2C(j, i, y)] = d[j];
-                        }
-                        printProgress(i, x);
-                    }
-                }
+                hs >> outX >> outY;
             }
         }
         else//oldest-version
         {
-            t_index x, y;
+            outVersion = 0;
             std::stringstream hs(header);
-            hs >> x >> y;
-    
-            //assert (x >= 0 && y >= 0);
-    
-            //cout << "x:" << x << "\ny:" << y << std::endl;
-    
+            hs >> outX >> outY;
+        }
+        
+        std::cout << "v=" << outVersion << "x=" << outX << ", y=" << outY << std::endl;
+
+        return inStream;
+    }
+
+    std::istream &MatrixCpu::LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName)
+    {
+        if(inVersion == 0)
+        {
             if(!inTransposed)
             {
                 Reset(x, y, NULL, inCacheFileName);
@@ -264,9 +176,94 @@ namespace YAMATH
                 }
             }
         }
+        else if(inVersion == 1)//images ~ binary saved bytes => divide each value by 255
+        {
+            uint8_t d[y];
     
+#define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
+            if(!inTransposed)
+            {
+                Reset(x, y, NULL, inCacheFileName);
+
+                for(t_index i = 0; i < x; ++i)
+                {
+                    inStream.read((char*)d, y);
+    
+                    for(t_index j = 0; j < y; ++j)
+                    {
+                        m_Data[IDX2C(i, j, x)] = d[j]/255.0f;
+                    }
+
+                    printProgress(i, x);
+                }
+            }
+            else
+            {
+                Reset(y, x, NULL, inCacheFileName);
+                for(t_index i = 0; i < x; ++i)
+                {
+                    inStream.read((char*)d, y);
+    
+                    for(t_index j = 0; j < y; ++j)
+                    {
+                        m_Data[IDX2C(j, i, y)] = d[j]/255.0f;
+                    }
+                    printProgress(i, x);
+                }
+            }
+        }
+        else if (inVersion == 2)//binary saved floats
+        {
+            float d[y];
+    
+            t_index sizeOfSavedFloat = 4;
+            assert(sizeof(float) == sizeOfSavedFloat);
+    
+            if(!inTransposed)
+            {
+                Reset(x, y, NULL, inCacheFileName);
+                for(t_index i = 0; i < x; ++i)
+                {
+                    inStream.read((char*)d, y*sizeOfSavedFloat);
+    
+                    for(t_index j = 0; j < y; ++j)
+                    {
+                        m_Data[IDX2C(i, j, x)] = d[j];
+                    }
+                    printProgress(i, x);
+                }
+            }
+            else
+            {
+                Reset(y, x, NULL, inCacheFileName);
+                for(t_index i = 0; i < x; ++i)
+                {
+                    inStream.read((char*)d, y*sizeOfSavedFloat);
+    
+                    for(t_index j = 0; j < y; ++j)
+                    {
+                        m_Data[IDX2C(j, i, y)] = d[j];
+                    }
+                    printProgress(i, x);
+                }
+            }
+        }
+        else
+        {
+            assert(0);
+        }
     
         return inStream;
+    }
+
+    std::istream &MatrixCpu::Load(std::istream &inStream, bool inTransposed, const std::string &inCacheFileName)
+    {
+        t_index x, y;
+        int version;
+
+        LoadHeader(inStream, version, x, y);
+        LoadBatch (inStream, inTransposed, version, x, y, inCacheFileName);
     }
     
     std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version)

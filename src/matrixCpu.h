@@ -39,6 +39,10 @@ namespace YAMATH
 
 //column-first order - ld is leading dimension size - #rows
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
+            static std::istream &LoadHeader(std::istream &inStream, int &outVersion, t_index &outX, t_index &outY);
+            std::istream &LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName);
+
             std::istream &Load(std::istream &inStream, bool inTransposed = false, const std::string &inCacheFileName = "");
 
             static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version = 2);

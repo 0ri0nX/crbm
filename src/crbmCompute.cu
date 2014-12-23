@@ -60,13 +60,17 @@ int main(int argc, char** argv)
 
     cout << "Maximal batch size: " << batchSize << endl;
 
-    MatrixCpu *xCpu = new MatrixCpu();
+    MatrixCpu xCpu;
 
-    loadMatrix(*xCpu, argv[3], true, string(argv[3]) + ".cache");
+    Timer timer;
+    t_index cols = 0;
+    t_index rows = 0;
+    int loadVersion = -1;
 
-    //transposition
-    int cols = xCpu->getX();
-    int rows = xCpu->getY();
+    //data-file
+    std::ifstream fdata(argv[3]);
+
+    xCpu.LoadHeader(fdata, loadVersion, rows, cols);
 
     int batchNum = (rows - 1) / batchSize + 1;
 
@@ -101,31 +105,45 @@ int main(int argc, char** argv)
 
     ofstream f(outFilename.c_str());
 
-    const int saveVersion = 0;
+    int saveVersion = -1;
+    if(computationType == "reconstruct")
+    {
+        saveVersion = 0;
+    }
+    if(computationType == "transform")
+    {
+        saveVersion = 2;
+    }
 
     MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
     //f << rows << " " << resSize << endl;
 
+    MatrixCpu xxCpu;
     Mat xx, xxTrans;
     MatrixCpu tmpxx;
-    Timer timer;
+    timer.tic();
 
-    for(int batch = 0; batch < batchNum; ++batch)
+    for(int batch = 1; batch <= batchNum; ++batch)
     {
-        int a = batch*batchSize;
-        int b = min((batch+1)*batchSize, rows);
+        //int a = batch*batchSize;
+        //int b = min((batch+1)*batchSize, rows);
 
-        cout << batch+1 << " / " << batchNum << endl;
+        cout << batch << " / " << batchNum << endl;
 
         timer.tic();
 
+        t_index actBatchSize = (batch != batchNum) ? batchSize : (rows - (batchNum-1)*batchSize);
+
+        xxCpu.LoadBatch(fdata, false, loadVersion, actBatchSize, cols, "");
+        xx = xxCpu;
+
         //xx = xCpu->SubMatrix(a, 0, b, cols);
 
-        xx = xCpu->SubMatrix(0, a, cols, b);
+        //xx = xCpu->SubMatrix(0, a, cols, b);
 
         //transposition needed
-        xx.Transpose();
-        xx.MakeHardCopy();
+        //xx.Transpose();
+        //xx.MakeHardCopy();
 
         timer.tac("   selected: ");
 

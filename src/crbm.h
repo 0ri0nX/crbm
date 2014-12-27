@@ -588,11 +588,35 @@ namespace CRBM
 
     }
 
+    void testNan(const YAMATH::MatrixGpu &inInp)
+    {
+        YAMATH::MatrixGpu r;
+        r = inInp.Sum();
+        YAMATH::MatrixCpu rr = r;
+
+        assert(inInp.getX()*inInp.getY() > 0);
+    
+        float res = rr.getDataConst()[0]/(inInp.getX()*inInp.getY());
+
+        if(isnan(res) || isinf(res))
+        {
+            std::cout << "Returned " << res << " when computing error!" << std::endl;
+
+            //YAMATH::MatrixCpu zz = inInp;
+            //for(YAMATH::t_index i = 0; i < zz.getX()*zz.getY(); ++i)
+            //{
+            //    cout << " " << zz.getDataConst()[i];
+            //}
+
+            assert(0);
+        }
+    }
+
     float computeError(const YAMATH::MatrixGpu &inInp, const YAMATH::MatrixGpu &inOut)
     {
         YAMATH::MatrixGpu r2, r3;
         r2 = inInp - inOut;
-        r2 ^= 2.0f;
+        r2 = r2 ^ 2.0f;
         r3 = r2.Sum();
     
         YAMATH::MatrixCpu rr = r3;
@@ -603,6 +627,13 @@ namespace CRBM
         if(isnan(res) || isinf(res))
         {
             std::cout << "Returned " << res << " when computing error!" << std::endl;
+
+            YAMATH::MatrixCpu zz = inInp;
+            for(YAMATH::t_index i = 0; i < zz.getX()*zz.getY(); ++i)
+            {
+                std::cout << " " << zz.getDataConst()[i];
+            }
+
             exit(1);
         }
 
@@ -613,7 +644,7 @@ namespace CRBM
     {
         YAMATH::MatrixGpu r2, r3;
         r2 = inW;
-        r2 ^= 2.0f;
+        r2 = r2 ^ 2.0f;
         r3 = r2.Sum();
     
         YAMATH::MatrixCpu rr = r3;
@@ -648,14 +679,19 @@ namespace CRBM
 
                 //transposition needed
                 batch = batchCpu;
+                testNan(batch);
                 batch.Transpose();
+                testNan(batch);
                 batch.MakeHardCopy();
+                testNan(batch);
             }
             else
             {
                 inData.Sample(s().batchSize, batchCpu);
                 batch = batchCpu;
             }
+
+            testNan(batch);
 
             t.tac();
 
@@ -717,10 +753,11 @@ namespace CRBM
     {
         Timer timer;
 
-        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2;
+        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, dw1a, dw2a;
 
         //timer.tic();
         std::cout << "    Preparing data ... " << std::flush;
+        testNan(inBatch);
         Convolve(inBatch, x);
         timer.tac();
 
@@ -737,35 +774,65 @@ namespace CRBM
 
         for(int i = 1; i <= s().batchIterations && !IsStopRequired(); ++i)
         {
+            testNan(x);
+            testNan(m_Weights);
             y = Mult(x, m_Weights);
+            testNan(y);
             ActivationFunction(y, s().activationFunctionH);
+            testNan(y);
 
             x2 = Mult(y, m_Weights.T());
+            testNan(x2);
             ActivationFunction(x2, s().activationFunctionV);
+            testNan(x2);
 
             y2 = Mult(x2, m_Weights);
+            testNan(y2);
             ActivationFunction(y2, s().activationFunctionH);
+            testNan(y2);
 
             dw1 = Mult(x.T(), y);
+            testNan(dw1);
             dw2 = Mult(x2.T(), y2);
+            testNan(dw2);
 
-            dw1 *= (s().learningRate/x.getX());
-            dw2 *= (s().learningRate/x.getX());
+            //std::cout << "lr:" << s().learningRate << std::endl;
+            //std::cout << "getx:" << x.getX() << std::endl;
+            //std::cout << "lr/getx:" << s().learningRate/x.getX() << std::endl;
+
+            //dw1 *= (s().learningRate/x.getX());
+            //dw1a = dw1 * (s().learningRate/x.getX());
+            dw1 = dw1 * (s().learningRate/x.getX());
+            testNan(dw1);
+            //dw1 = dw1a;
+            testNan(dw1a);
+            dw2 = dw2 * (s().learningRate/x.getX());
+            testNan(dw2);
 
             if(s().decayRate > 0.0f)
             {
                 m_Weights *= (1.0f - s().decayRate);
+                testNan(m_Weights);
             }
 
-            m_Weights += dw1;
-            m_Weights -= dw2;
+            testNan(m_Weights);
+            testNan(dw1);
+            //m_Weights = m_Weights + dw1;
+            dw1a = m_Weights + dw1;
+            m_Weights = dw1a;
+            testNan(m_Weights);
+            m_Weights = m_Weights - dw2;
+            testNan(m_Weights);
 
             if(s().momentum > 0.0f)
             {
                 inOutLastWeights *= s().momentum;
+                testNan(inOutLastWeights);
                 m_Weights *= (1.0f - s().momentum);
+                testNan(m_Weights);
 
                 m_Weights += inOutLastWeights;
+                testNan(m_Weights);
                 inOutLastWeights = m_Weights;
             }
 

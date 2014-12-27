@@ -33,13 +33,15 @@ if len(sys.argv) != 3:
     print sys.argv[0], "<transformed-images> <rbm-file1> ... <rbm-fileN>"
     exit(1)
 
-instance = c.CRBMComputer(["../dataConv/data5-5k-200x200x3.txt.rbm"
-    , "../dataConv/data5-5k-200x200x3.txt.transformed.rbm"
-    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.rbm"
-    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.rbm"
-    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.rbm"
-    , "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.transformed.rbm"
-    ], 1)
+instance = c.CRBMComputer(sys.argv[2:]
+    #["../dataConv/data5-5k-200x200x3.txt.rbm"
+    #, "../dataConv/data5-5k-200x200x3.txt.transformed.rbm"
+    #, "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.rbm"
+    #, "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.rbm"
+    #, "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.rbm"
+    #, "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.transformed.rbm"
+    #]
+        , 1)
 
 #instance = c.CRBMComputer(sys.argv[2:], 1)
 

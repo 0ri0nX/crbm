@@ -118,6 +118,64 @@ namespace YAMATH
             //sampls columns - effective
             void SampleCols(t_index inColsNum, MatrixCpu &outSample) const;
 
+            bool isCached(t_index inDataSize)
+            {
+                if(m_CacheFileName != "")
+                {
+                    t_index fsize = inDataSize*sizeof(float);
+                    int result = lseek(m_FileCache, fsize, SEEK_SET);
+                    if (result == -1)
+                    {
+                        close(m_FileCache);
+                        throw std::runtime_error("Error calling lseek() to 'stretch' the file");
+                    }
+                    char testData[getCachedTestSize()];
+
+                    ssize_t size = read(m_FileCache, testData, getCachedTestSize());
+                    
+                    if(size == getCachedTestSize())
+                    {
+                        bool ok = true;
+                        for(int i = 0; i < getCachedTestSize(); ++i)
+                        {
+                            ok = ok && testData[i] == '+';
+                        }
+
+                        return ok;
+                    }
+                }
+
+                return false;
+            }
+            void setCached(t_index inDataSize, bool yes)
+            {
+                if(m_CacheFileName != "")
+                {
+                    t_index size = inDataSize*sizeof(float);
+                    ssize_t result = lseek(m_FileCache, size, SEEK_SET);
+                    if (result == -1)
+                    {
+                        close(m_FileCache);
+                        throw std::runtime_error("Error calling lseek() to 'stretch' the file");
+                    }
+                    
+                    for(int i = 0; i < getCachedTestSize(); ++i)
+                    {
+                        result = write(m_FileCache, (yes) ? "+" : "-", 1);
+                        if (result == -1)
+                        {
+                            close(m_FileCache);
+                            throw std::runtime_error("Error calling write() to the file");
+                        }
+                    }
+
+                }
+            }
+            int getCachedTestSize(void)
+            {
+                return 4;
+            }
+
             void AllocateMemory(t_index inDataSize, const std::string &inCacheFileName)
             {
                 m_CacheFileName = inCacheFileName;
@@ -127,27 +185,28 @@ namespace YAMATH
                     t_index size = inDataSize*sizeof(float);
                     //std::cout << "step 1" << std::endl;
 
-                    m_FileCache = open(m_CacheFileName.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+                    //m_FileCache = open(m_CacheFileName.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+                    m_FileCache = open(m_CacheFileName.c_str(), O_RDWR | O_CREAT, (mode_t)0600);
                     if (m_FileCache == -1)
                     {
                         throw std::runtime_error("Error opening file for writing");
                     }
 
-                    //std::cout << "step 2" << std::endl;
-                    // Stretch the file size to the size of the (mmapped) array of ints
-                    int result = lseek(m_FileCache, size-1, SEEK_SET);
-                    if (result == -1)
+                    if(!isCached(inDataSize))
                     {
-                        close(m_FileCache);
-                        throw std::runtime_error("Error calling lseek() to 'stretch' the file");
-                    }
 
-                    //std::cout << "step 3" << std::endl;
-                    result = write(m_FileCache, "", 1);
-                    if (result != 1)
-                    {
+                        //std::cout << "NOT CACHED" << std::endl;
                         close(m_FileCache);
-                        throw std::runtime_error("Error writing last byte of the file");
+                        m_FileCache = open(m_CacheFileName.c_str(), O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+                        if (m_FileCache == -1)
+                        {
+                            throw std::runtime_error("Error opening file for writing");
+                        }
+                        setCached(inDataSize, false);
+                    }
+                    else
+                    {
+                        //std::cout << "CACHED" << std::endl;
                     }
 
                     //std::cout << "step 4" << std::endl;

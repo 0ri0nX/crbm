@@ -79,17 +79,26 @@ namespace YAMATH
             randomCol[i] = dist(randomDevice);
             if(m_CacheFileName != "")
             {
-                madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_WILLNEED);
+                madvise(getDataConst() + randomCol[i]*getX(), getX()*sizeof(float), MADV_WILLNEED);
             }
         }
   
         for(t_index i = 0; i < inColsNum; ++i)
         {
             memcpy(outSample.getData() + i*getX(), getDataConst() + randomCol[i]*getX(), getX()*sizeof(float));
+            for(t_index j = 0; j < getX(); ++j)
+            {
+                float* res = outSample.getData() + i*getX() + j;
+
+                if(isnan(*res) || isinf(*res))
+                {
+                    std::cout << "NaN: " << randomCol[i] << " , " << j << std::endl;
+                }
+            }
   
             if(m_CacheFileName != "")
             {
-                madvise(getDataConst() + randomCol[i], getX()*sizeof(float), MADV_NORMAL);
+                madvise(getDataConst() + randomCol[i]*getX(), getX()*sizeof(float), MADV_NORMAL);
             }
         }
     }
@@ -154,6 +163,11 @@ namespace YAMATH
             if(!inTransposed)
             {
                 Reset(x, y, NULL, inCacheFileName);
+                if(isCached(x*y))
+                {
+                    std::cout << "Using cache in the file: [" << inCacheFileName << "]" << std::endl;
+                    return inStream;
+                }
                 for(t_index i = 0; i < x; ++i)
                 {
                     for(t_index j = 0; j < y; ++j)
@@ -166,6 +180,11 @@ namespace YAMATH
             else
             {
                 Reset(y, x, NULL, inCacheFileName);
+                if(isCached(x*y))
+                {
+                    std::cout << "Using cache in the file: [" << inCacheFileName << "]" << std::endl;
+                    return inStream;
+                }
                 for(t_index i = 0; i < x; ++i)
                 {
                     for(t_index j = 0; j < y; ++j)
@@ -186,6 +205,11 @@ namespace YAMATH
             {
                 Reset(x, y, NULL, inCacheFileName);
 
+                if(isCached(x*y))
+                {
+                    std::cout << "Using cache in the file: [" << inCacheFileName << "]" << std::endl;
+                    return inStream;
+                }
                 for(t_index i = 0; i < x; ++i)
                 {
                     inStream.read((char*)d, y);
@@ -201,6 +225,11 @@ namespace YAMATH
             else
             {
                 Reset(y, x, NULL, inCacheFileName);
+                if(isCached(x*y))
+                {
+                    std::cout << "Using cache in the file: [" << inCacheFileName << "]" << std::endl;
+                    return inStream;
+                }
                 for(t_index i = 0; i < x; ++i)
                 {
                     inStream.read((char*)d, y);
@@ -223,6 +252,11 @@ namespace YAMATH
             if(!inTransposed)
             {
                 Reset(x, y, NULL, inCacheFileName);
+                if(isCached(x*y))
+                {
+                    std::cout << "Using cache in the file: [" << inCacheFileName << "]" << std::endl;
+                    return inStream;
+                }
                 for(t_index i = 0; i < x; ++i)
                 {
                     inStream.read((char*)d, y*sizeOfSavedFloat);
@@ -237,6 +271,11 @@ namespace YAMATH
             else
             {
                 Reset(y, x, NULL, inCacheFileName);
+                if(isCached(x*y))
+                {
+                    std::cout << "Using cache in the file: [" << inCacheFileName << "]" << std::endl;
+                    return inStream;
+                }
                 for(t_index i = 0; i < x; ++i)
                 {
                     inStream.read((char*)d, y*sizeOfSavedFloat);
@@ -253,6 +292,8 @@ namespace YAMATH
         {
             assert(0);
         }
+
+        setCached(x*y, true);
     
         return inStream;
     }

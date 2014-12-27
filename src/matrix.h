@@ -565,9 +565,18 @@ int MatrixGpu::m_Allocations = 0;
 
                 assert (stat == CUBLAS_STATUS_SUCCESS);
 
-                cublasSgemm(handle, !m_A.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T, !m_B.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T,
+                cublasStatus_t result = cublasSgemm(handle, !m_A.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T, !m_B.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T,
                         x, y, kA,
                         &m_One, m_A.getDataConst(), m_A.getX(), m_B.getDataConst(), m_B.getX(), &m_Zero, outMatrix.getDataConst(), x);
+
+                if(result != CUBLAS_STATUS_SUCCESS)
+                {
+                    std::cout << "CUBLAS_STATUS_NOT_INITIALIZED: "  << (result == CUBLAS_STATUS_NOT_INITIALIZED  ) << std::endl;
+                    std::cout << "CUBLAS_STATUS_INVALID_VALUE: "    << (result == CUBLAS_STATUS_INVALID_VALUE    ) << std::endl;
+                    std::cout << "CUBLAS_STATUS_ARCH_MISMATCH: "    << (result == CUBLAS_STATUS_ARCH_MISMATCH    ) << std::endl;
+                    std::cout << "CUBLAS_STATUS_EXECUTION_FAILED: " << (result == CUBLAS_STATUS_EXECUTION_FAILED ) << std::endl;
+                    assert(0);
+                }
 
                 cublasDestroy(handle);
 
@@ -795,8 +804,8 @@ int MatrixGpu::m_Allocations = 0;
         {
             static t_index ThreadsPerBlock = 32; //shared memory need to be at least sizeof(float) * ThreadsPerBlock^2
 
-            t_index sx = min(ThreadsPerBlock, inSourceX);
-            t_index sy = min(ThreadsPerBlock, inSourceY);
+            t_index sx = min((unsigned long long)ThreadsPerBlock, (unsigned long long)inSourceX);
+            t_index sy = min((unsigned long long)ThreadsPerBlock, (unsigned long long)inSourceY);
 
             dim3 threadsPerBlock(sx, sy, 1);
 
@@ -1106,8 +1115,9 @@ int MatrixGpu::m_Allocations = 0;
             t_index x, y;
             bool trans;
             inOperation.GetResultSize(x, y, trans);
-            Init(x, y, trans);
 
+            //Init(x, y, trans);
+            MatrixGpu xxx(x, y, trans);
 
             //TODO:optimization step
             //OptimizationInfo optInfo;
@@ -1118,7 +1128,9 @@ int MatrixGpu::m_Allocations = 0;
             gpuErrchk( cudaPeekAtLastError() );
             gpuErrchk( cudaDeviceSynchronize() );
 
-            inOperation.Execute(*this);
+            //inOperation.Execute(*this);
+            inOperation.Execute(xxx);
+            *this = xxx;
 
             gpuErrchk( cudaPeekAtLastError() );
             gpuErrchk( cudaDeviceSynchronize() );
@@ -1191,6 +1203,7 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator^=(float inExponent)
     {
+        assert(0);
         if(inExponent == 2.0f)
         {
             return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f));
@@ -1207,6 +1220,7 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator*=(float inVal)
     {
+        assert(0);
         return this->operator=(OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal));
     }
 
@@ -1232,21 +1246,25 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator+=(const MatrixGpu &inB) 
     {
+        assert(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Plus));
     }
 
     MatrixGpu &MatrixGpu::operator-=(const MatrixGpu &inB)
     {
+        assert(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Minus));
     }
 
     MatrixGpu &MatrixGpu::operator*=(const MatrixGpu &inB)
     {
+        assert(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Multiply));
     }
 
     MatrixGpu &MatrixGpu::operator/=(const MatrixGpu &inB)
     {
+        assert(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide));
     }
 

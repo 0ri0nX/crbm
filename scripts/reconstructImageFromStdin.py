@@ -13,7 +13,7 @@ def reconstruct(data):#list of data
     #
     #    print idx, zz[:10] 
     
-    print "shape:", np.array(data).transpose().shape
+    #print "shape:", np.array(data).transpose().shape
 
     batchX = np.array(data).transpose().flatten().tolist()
     
@@ -24,13 +24,13 @@ def reconstruct(data):#list of data
 
     batchY = np.array(bb).reshape(instance.inputNum, len(bb)/instance.inputNum).transpose()
     
-    for i in range(len(data)):
-        print i, batchY[i, :10]
+    #for i in range(len(data)):
+    #    print i, batchY[i, :10]
 
     return batchY
 
 if len(sys.argv) < 3:
-    print sys.argv[0], "<transformed-images> <rbm-file1> ... <rbm-fileN>"
+    print sys.argv[0], "<output-reconstructed-image-file-name-prefix> <rbm-file1> ... <rbm-fileN>"
     exit(1)
 
 instance = c.CRBMComputer(sys.argv[2:]
@@ -45,18 +45,29 @@ instance = c.CRBMComputer(sys.argv[2:]
 
 #instance = c.CRBMComputer(sys.argv[2:], 1)
 
-val = 300.0
-#val = 1.0
-
 d = []
-
-for i in range(min(1024, instance.outputNum)):
-    z = [0]*instance.outputNum
-    z[i] = val
-    if i < instance.outputNum-1:
-        z[i+1] = val
-
+limit = 100
+for i in sys.stdin:
+    if limit <= 0:
+        break
+    limit -= 1
+    z = map(float, i.strip().split())
+    if len(z) < instance.outputNum:
+        z += [0.0]*(instance.outputNum - len(z))
+        print "extending data by", instance.outputNum - len(z), " zero-values"
+    #print len(z)
+    assert len(z) == instance.outputNum
     d.append(z)
+
+#d = []
+#
+#for i in range(min(1024, instance.outputNum)):
+#    z = [0]*instance.outputNum
+#    z[i] = val
+#    if i < instance.outputNum-1:
+#        z[i+1] = val
+#
+#    d.append(z)
 
 m = reconstruct(d)
 

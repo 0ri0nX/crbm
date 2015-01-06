@@ -12,7 +12,7 @@ stop = 10
 #size = (39, 39)
 
 if len(sys.argv) not in [2,3,4]:
-    print sys.argv[0], "<image-matrix> [limit=" + str(limit) + "]"
+    print sys.argv[0], "<image-matrix> [limit=" + str(stop) + "]"
     print sys.argv[0], "<image-matrix> <start> <stop>"
     print "\texpecting image-size", size
     exit(1)

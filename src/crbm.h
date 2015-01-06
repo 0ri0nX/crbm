@@ -838,9 +838,15 @@ namespace CRBM
 
             if(i % s().logModulo == 0 || i == s().batchIterations || i == 1)
             {
+                float lastError = error;
                 error = computeError(x, x2);
                 if(i != 1)
                 {
+                    if(lastError < error)
+                    {
+                        std::cout << " !!!!";
+                    }
+
                     std::cout << ",";
                 }
 

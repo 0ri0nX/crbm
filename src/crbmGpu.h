@@ -1,7 +1,7 @@
 #ifndef CRBM_H
 #define CRBM_H
 
-#include "matrixCpu.h"
+#include "matrix.h"
 #include "utils.h"
 #include <stdexcept>
 #include <sstream>

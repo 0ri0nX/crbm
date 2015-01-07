@@ -1,7 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "matrix.h"
+#include "matrixCpu.h"
 #include <time.h>
 #include <string>
 #include <iostream>
@@ -35,12 +35,6 @@ class Timer
 };
 
 
-void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM)
-{
-    YAMATH::MatrixCpu x = inM;
-    msgC(inMsg, x);
-}
-
 void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false, const std::string &inCacheFileName = "")
 {
     std::cout << "loading [" << filename << "] ... " << std::flush;
@@ -62,12 +56,6 @@ void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
     f.close();
     t.tac();
     //msgC(filename.c_str(), inM);
-}
-
-void saveMatrix(const YAMATH::MatrixGpu &inM, const std::string &filename)
-{
-    YAMATH::MatrixCpu resx = inM;
-    saveMatrix(resx, filename);
 }
 
 #endif //UTILS_H

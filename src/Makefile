@@ -1,4 +1,5 @@
-all: crbm crbmCompute
+all:
+#all: crbm crbmCompute
 #all: rbm linearCombiner linearCombinerDynamic compute
 
 %.o: %.cu matrix.h Makefile utils.h crbm.h

@@ -6,13 +6,13 @@
 
 namespace CRBM
 {
-    class CRBMLayer;
+    class CRBMLayerGpu;
 }
 
 class CRBMStack
 {
     private:
-        std::vector<CRBM::CRBMLayer*> m_Layers;
+        std::vector<CRBM::CRBMLayerGpu*> m_Layers;
 
     public:
         CRBMStack(const std::vector<std::string> &inRBMFiles, int inGpuID = 0);

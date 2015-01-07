@@ -8,7 +8,7 @@
 
 #include "crbmComputer.h"
 
-#include "../src/crbm.h"
+#include "../src/crbmGpu.h"
 using namespace std;
 using namespace YAMATH;
 
@@ -19,7 +19,7 @@ CRBMStack::CRBMStack(int inLength, const char** inRBMFiles, int inGpuID)
 
     for(int i = 0; i < inLength; ++i)
     {
-        CRBM::CRBMLayer *l = new CRBM::CRBMLayer();
+        CRBM::CRBMLayerGpu *l = new CRBM::CRBMLayerGpu();
         l->Load(inRBMFiles[i]);
         m_Layers.push_back(l);
     }
@@ -31,7 +31,7 @@ CRBMStack::CRBMStack(const std::vector<string> &inRBMFiles, int inGpuID)
 
     for(int i = 0; i < inRBMFiles.size(); ++i)
     {
-        CRBM::CRBMLayer *l = new CRBM::CRBMLayer();
+        CRBM::CRBMLayerGpu *l = new CRBM::CRBMLayerGpu();
         l->Load(inRBMFiles[i]);
         m_Layers.push_back(l);
     }

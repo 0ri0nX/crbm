@@ -26,6 +26,7 @@ fs = "<" + "B"*(size[0]*size[1]*3)
 while len(data) > limit:
 
     f=open(sys.argv[1] + "." + str(fidx), "wb")
+    fInfo=open(sys.argv[1] + "." + str(fidx) + ".info", "w")
     fidx += 1
 
     f.write("Matrix " + str(VERSION) + "\n")
@@ -58,12 +59,14 @@ while len(data) > limit:
         
         #print " ".join(d)
         f.write(struct.pack(fs, *d))
+        fInfo.write(iii + "\n")
 
         idx += 1
     
     sys.stderr.write("\n")
     
     f.close()
+    fInfo.close()
 
     data = data[idx:]
 

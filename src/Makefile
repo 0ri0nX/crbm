@@ -1,4 +1,4 @@
-all: crbmComputeGpu
+all: crbmComputeGpu crbmGpu
 #all: crbm crbmComputeGpu
 #all: rbm linearCombiner linearCombinerDynamic compute
 
@@ -11,8 +11,8 @@ all: crbmComputeGpu
 test: test.cu matrix.h
 	nvcc -o test -D CUDA test.cu -lcublas -lcurand -D DEBUG
 
-crbm: matrix.h utils.h crbm.h crbm.o Makefile utils.h matrixCpu.o
-	nvcc --gpu-architecture=sm_35 -o crbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbm.o matrixCpu.o -g
+crbmGpu: matrix.h utils.h utilsGpu.h crbm.h crbmGpu.h crbmGpu.o Makefile matrixCpu.o
+	nvcc --gpu-architecture=sm_35 -o crbm -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbmGpu.o matrixCpu.o -g
 
 crbmComputeGpu: matrix.h utils.h utilsGpu.h crbm.h crbmGpu.h crbmComputeGpu.o Makefile matrixCpu.o
 	nvcc -Xcompiler "-std=c++0x" --gpu-architecture=sm_35 -o crbmComputeGpu -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbmComputeGpu.o matrixCpu.o -g

@@ -11,13 +11,12 @@
 using namespace std;
 
 #include "matrix.h"
-#include "utils.h"
-#include "crbm.h"
+#include "crbmGpu.h"
 
 using namespace YAMATH;
 typedef MatrixGpu Mat;
 
-CRBM::CRBMLayer *abc = NULL;
+CRBM::CRBMLayerGpu *abc = NULL;
 
 void signalHandler(int signum)
 {
@@ -78,7 +77,7 @@ int main(int argc, char** argv)
     if(string(argv[2]) != "-")
     {
         cout << "Loading RBM-layer ... " << flush;
-        abc = new CRBM::CRBMLayer(setting);
+        abc = new CRBM::CRBMLayerGpu(setting);
         abc->Load(string(argv[2]));
 
         //reset loaded setting
@@ -87,7 +86,7 @@ int main(int argc, char** argv)
     else
     {
         cout << "Creating RBM-layer ... " << flush;
-        abc = new CRBM::CRBMLayer(setting);
+        abc = new CRBM::CRBMLayerGpu(setting);
         timer.tac("  ... done in ");
     }
 

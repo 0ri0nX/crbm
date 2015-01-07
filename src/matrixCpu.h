@@ -23,6 +23,7 @@
 namespace YAMATH
 {
     typedef unsigned long t_index;
+    
     class MatrixGpu;//forward
 
     class MatrixCpu//column-first layout
@@ -76,7 +77,7 @@ namespace YAMATH
                 return m_Data[IDX2C(inX, inY, getX())];
             }
 
-            
+            void RandNormal(float inMean, float inStdDev, unsigned long long inSeed = 0);//normal randomess, mean 0.0f standard deviation 1.0f
 
             MatrixCpu SubMatrix(t_index inStartRow, t_index inStartCol, t_index inEndRow, t_index inEndCol) //start is inclusive, end is NON inclusive
             {
@@ -269,6 +270,10 @@ namespace YAMATH
 
             MatrixCpu &operator=(const MatrixGpu &inMatrix);
             MatrixCpu &operator=(const MatrixCpu &inMatrix);
+
+            MatrixCpu &operator*=(const MatrixCpu &inB);//elementwise multiplication!
+
+            friend MatrixCpu Mult(const MatrixCpu &inA, const MatrixCpu &inB, bool transposedA = false, bool transposedB = false);//matrix multiplication!
 
         protected:
 

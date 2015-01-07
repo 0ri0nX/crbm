@@ -22,6 +22,7 @@
 
 #include "matrixCpu.h"
 
+#include <cblas.h>
 namespace YAMATH
 {
     /*MatrixCpu::MatrixCpu(const MatrixGpu &inMatrix)
@@ -410,6 +411,50 @@ namespace YAMATH
         return outStream;
     }
 
+    void MatrixCpu::RandNormal(float inMean, float inStdDev, unsigned long long inSeed)//normal randomess, mean 0.0f standard deviation 1.0f
+    {
+        //TODO: inSeed != 0 ? inSeed : (unsigned long long) clock()
+        std::random_device randomDevice;
+        std::normal_distribution<float> dist(inMean, inStdDev);
+  
+        for(t_index i = 0; i < getX()*getY(); ++i)
+        {
+            getData()[i] = dist(randomDevice);
+        }
+    }
+
+    MatrixCpu &MatrixCpu::operator*=(const MatrixCpu &inB)//elementwise multiplication!
+    {
+        for(t_index i = 0; i < getX()*getY(); ++i)
+        {
+            getData()[i] *= inB.getDataConst()[i];
+        }
+    }
+
+    MatrixCpu Mult(const MatrixCpu &inA, const MatrixCpu &inB, bool transposedA, bool transposedB)//matrix multiplication!
+    {
+        t_index x = !transposedA ? inA.getX() : inA.getY();
+        t_index y = !transposedB ? inB.getY() : inB.getX();
+        t_index kA = !transposedA ? inA.getY() : inA.getX();
+        t_index kB = !transposedB ? inB.getX() : inB.getY();
+
+        //cout << "TA:" << inA.isTrans() << ", TB:" << inB.isTrans() << endl;
+        assert(kA == kB);
+
+        MatrixCpu outMatrix(x, y);
+
+        //void cblas_sgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA, const enum CBLAS_TRANSPOSE TransB
+        //         , const int M, const int N, const int K
+        //         , const float alpha, const float *A, const int lda
+        //         , const float *B, const int ldb,
+        //         const float beta, float *C, const int ldc);
+
+        cblas_sgemm(CblasColMajor, !transposedA ? CblasNoTrans : CblasTrans, !transposedB ? CblasNoTrans : CblasTrans
+                , x, y, kA
+                , 1.0f, inA.getDataConst(), inA.getX()
+                , inB.getDataConst(), inB.getX()
+                , 0.0f, outMatrix.getDataConst(), x);
+    }
 }
 
 void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)

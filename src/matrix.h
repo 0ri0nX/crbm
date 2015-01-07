@@ -28,7 +28,6 @@ void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM);
 
 namespace YAMATH
 {
-    typedef unsigned long t_index;
 
 //#define DEBUG_MATRIX_CLASS
 //#define DEBUG_ALLOCATION

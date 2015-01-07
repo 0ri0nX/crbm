@@ -119,5 +119,24 @@ void lv(std::istream &in, const std::string &inName, T &outValue)
     checkVal(inName, name);
 }
  
+//load from stream (cpu matrix)
+template<>
+void lv<>(std::istream &in, const std::string &inName, YAMATH::MatrixCpu &outValue)
+{
+    std::string name;
+    in >> name;
+    in.ignore(1);
+    assert(name == inName);
 
+    outValue.Load(in);
+}
+
+//save to stream (cpu matrix)
+template<>
+void sv<>(std::ostream &out, const std::string &inName, const YAMATH::MatrixCpu &inValue)
+{
+    out << inName << " ";
+    inValue.Save(out, true, 2);
+    out << std::endl;
+}
 #endif //UTILS_H

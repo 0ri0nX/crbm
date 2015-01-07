@@ -13,8 +13,7 @@
 using namespace std;
 
 #include "matrix.h"
-#include "utils.h"
-#include "crbm.h"
+#include "crbmGpu.h"
 
 using namespace YAMATH;
 
@@ -74,12 +73,12 @@ int main(int argc, char** argv)
 
     int batchNum = (rows - 1) / batchSize + 1;
 
-    std::vector<CRBM::CRBMLayer*> layers;
+    std::vector<CRBM::CRBMLayerGpu*> layers;
 
     for(int i = 4; i < argc; ++i)
     {
         cout << i-3 << ". ";
-        CRBM::CRBMLayer *l = new CRBM::CRBMLayer();
+        CRBM::CRBMLayerGpu *l = new CRBM::CRBMLayerGpu();
         l->Load(string(argv[i]));
         layers.push_back(l);
     }

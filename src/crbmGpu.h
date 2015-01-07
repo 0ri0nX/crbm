@@ -1,131 +1,19 @@
-#ifndef CRBM_H
-#define CRBM_H
+#ifndef CRBMGPU_H
+#define CRBMGPU_H
 
 #include "matrix.h"
-#include "utils.h"
-#include <stdexcept>
-#include <sstream>
-#include "setting.h"
-#include <cmath>
+#include "utilsGpu.h"
+#include "crbm.h"
 
 namespace CRBM
 {
-
-    struct CRBMLayerSetting : SettingBase
-    {
-        CRBMLayerSetting()
-        {
-            x = 200;
-            y = 200;
-            z = 3;
-    
-            cx = 10;
-            cy = 10;
-    
-            stridex = 5;
-            stridey = 5;
-    
-            hidden = 15;
-    
-            batchSize = 100;
-            batchIterations = 100;
-            iterations = 1000;
-    
-            learningRate = 0.001f;
-            decayRate = 0.0f;
-    
-            logModulo = 50;
-
-            saveInterval = 10;
-            incrementalSave = 0;
-            incrementalSaveStart = 1;
-
-            activationFunctionH = 0;
-            activationFunctionV = 0;
-
-            momentum = 0.0f;
-    
-            //momentum = 0.9f;
-            //dataLimit = 0;
-            //binarySampling = 0;
-            //testBatchModulo = 1;
-            //AFUp = AFSigmoid;
-            //AFDown = AFSigmoid;
-            //computeOnly = 0;
-            //saveBestModel = 0;
-            //testFile = "";
-            //l2 = 0.0001;
-            //dataType = 0; //0 - sparse: id qid:qid 1:0.12 ... , //1 - images: id qid:qid 'path-to-image'
-            //imgType = 0; //0 color, 1 grey, 2 edge
-        }
-    
-        virtual void loadFromStream(std::ifstream &f)
-        {
-            x               = loadOption(f, "x",                            x);
-            y               = loadOption(f, "y",                            y);
-            z               = loadOption(f, "z",                            z);
-            cx              = loadOption(f, "cx",                           cx);
-            cy              = loadOption(f, "cy",                           cy);
-            stridex         = loadOption(f, "stridex",                      stridex);
-            stridey         = loadOption(f, "stridey",                      stridey);
-            hidden          = loadOption(f, "hidden",                       hidden);
-            batchSize       = loadOption(f, "batchSize",                    batchSize);
-            batchIterations = loadOption(f, "batchIterations",              batchIterations);
-            iterations      = loadOption(f, "iterations",                   iterations);
-            learningRate    = loadOption(f, "learningRate",                 learningRate);
-            decayRate       = loadOption(f, "decayRate",                    decayRate);
-            logModulo       = loadOption(f, "logModulo",                    logModulo);
-            saveInterval    = loadOption(f, "saveInterval",                 saveInterval);
-            incrementalSave = loadOption(f, "incrementalSave",              incrementalSave);
-            incrementalSaveStart            = loadOption(f, "incrementalSaveStart",                     incrementalSaveStart);
-            activationFunctionH             = loadOption(f, "activationFunctionH",                      activationFunctionH);
-            activationFunctionV             = loadOption(f, "activationFunctionV",                      activationFunctionV);
-            momentum        = loadOption(f, "momentum",                     momentum);
-        }
-    
-        //image-size
-        int x;
-        int y;
-        int z;
-    
-        //convolution-size
-        int cx;
-        int cy;
-    
-        //stride-size
-        int stridex;
-        int stridey;
-    
-        int hidden;
-    
-        int batchSize;
-        int batchIterations;
-        int iterations;
-        float learningRate;
-        float decayRate;
-
-        int activationFunctionH;
-        int activationFunctionV;
-   
-        int logModulo;
-        int saveInterval;
-        int incrementalSaveStart;
-        int incrementalSave;
-
-        float momentum;
-    };
-
-
-    class CRBMLayer
+    class CRBMLayerGpu : public CRBMLayer
     {
         public:
     
-            CRBMLayer(void) : m_SignalStop(false) {}
-            CRBMLayer(const CRBMLayerSetting &inSetting);
+            CRBMLayerGpu(void) : CRBMLayer() {}
+            CRBMLayerGpu(const CRBMLayerSetting &inSetting);
 
-            //weights are reseted only when topology changes or forced by forceResetWeights flag
-            void ResetSetting(const CRBMLayerSetting &inSetting, bool forceResetWeights = false);
-    
             //main data matrix is in GPU memory
             float LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName = "");
 
@@ -142,13 +30,7 @@ namespace CRBM
             void DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch);
             void DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
             void SetDeConvolveNormalizer(int numImages);
-            void getConvolutionPatchesNumber(int &outX, int &outY) const;
 
-            //returns size of transformed image (outx*outy*outz)
-            int getOutputSize(void) const;
-            //returns size of input image (inx*iny*inz)
-            int getInputSize(void) const;
-    
             //all parameters are from this layer
             void RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
             //all parameters are from this layer as well
@@ -156,116 +38,32 @@ namespace CRBM
     
             void ActivationFunction(YAMATH::MatrixGpu &inData, int inFunctionType) const;
     
-            void Save(std::ostream &outStream) const;
-            void Load(std::istream &inStream);
-            void Save(const std::string &inName) const;
-            void Load(const std::string &inName);
-    
-            void SignalStop(void) const;
-            void ClearStop(void) const;
-            bool IsStopRequired(void) const;
+            virtual void SaveSpecific(std::ostream &outStream) const;
+            virtual void LoadSpecific(std::istream &inStream);
 
-            void ResetWeights(void);
+            virtual void ResetWeights(void);
     
-            //returns setting - for convenience
-            const CRBMLayerSetting& s(void) const;
-
          protected:
-    
-   
-            CRBMLayerSetting m_Setting;
-    
             YAMATH::MatrixGpu m_Weights;
             YAMATH::MatrixGpu m_Normalizer;
-    
-            mutable bool m_SignalStop;
     };
 
-    CRBMLayer::CRBMLayer(const CRBMLayerSetting &inSetting) :
-        m_Setting(inSetting)
-        , m_SignalStop(false)
+    CRBMLayerGpu::CRBMLayerGpu(const CRBMLayerSetting &inSetting) :
+        CRBMLayer(inSetting)
     {
         ResetWeights();
     }
 
-    void CRBMLayer::ResetSetting(const CRBMLayerSetting &inSetting, bool forceResetWeights)
-    {
-        bool reset = forceResetWeights
-            || s().x != inSetting.x
-            || s().y != inSetting.y
-            || s().z != inSetting.z
-            || s().cx != inSetting.cx
-            || s().cy != inSetting.cy
-            || s().stridex != inSetting.stridex
-            || s().stridey != inSetting.stridey
-            || s().hidden != inSetting.hidden;
-
-        m_Setting = inSetting;
-
-        if(reset)
-        {
-            ResetWeights();
-        }
-    }
-
-    void CRBMLayer::ResetWeights(void)
+    void CRBMLayerGpu::ResetWeights(void)
     {
         m_Weights.Reset(s().cx*s().cy*s().z, s().hidden);
         m_Weights.RandNormal(0.0f, 1.0f/(10.0*s().hidden));
         std::cout << "weight matrix randomized!" << std::endl;
     }
 
-    const CRBMLayerSetting& CRBMLayer::s(void) const
-    {
-        return m_Setting;
-    }
-    
-    void CRBMLayer::SignalStop(void) const
-    {
-        m_SignalStop = true;
-    }
-
-    void CRBMLayer::ClearStop(void) const
-    {
-        m_SignalStop = false;
-    }
-
-    bool CRBMLayer::IsStopRequired(void) const
-    {
-        return m_SignalStop;
-    }
-
-    //a,b,c - coordinates, im - image index, x,y,z - size of image, totim - total number of images
-    inline int pixelInColMajor(int a, int b, int c, int im, int x, int y, int z, int totim)
-    {
-        int idx = im + c*totim + a*z*totim + b*x*z*totim;
-        //cout << "idx: " << idx << std::endl;
-        return idx;
-    }
-    
-    void CRBMLayer::getConvolutionPatchesNumber(int &outX, int &outY) const
-    {
-        outX = (s().x-s().cx)/s().stridex+1;
-        outY = (s().y-s().cy)/s().stridey+1;
-    }
-
-    int CRBMLayer::getOutputSize(void) const
-    {
-        int outx, outy;
-
-        getConvolutionPatchesNumber(outx, outy);
-
-        return outx*outy*s().hidden;
-    }
-
-    int CRBMLayer::getInputSize(void) const
-    {
-        return s().x*s().y*s().z;
-    }
-
     //x (width), y (height), z (depth or layer count), cx, cy is width and height of convolution filters, stridex/y are shifts of neighbour filters in x and y
     //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
-    void CRBMLayer::Convolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
+    void CRBMLayerGpu::Convolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         assert(inBatch.getY() == s().x*s().y*s().z);
 
@@ -339,7 +137,7 @@ namespace CRBM
 #endif //STREAMS_ON
     }
 
-    void CRBMLayer::SetDeConvolveNormalizer(int numImages)
+    void CRBMLayerGpu::SetDeConvolveNormalizer(int numImages)
     {
         //is already propetly set
         if(m_Normalizer.getX() == numImages && m_Normalizer.getY() == s().x*s().y*s().z)
@@ -381,7 +179,7 @@ namespace CRBM
         YAMATH::applyFunction<<<blocks, ThreadsPerBlock>>>(m_Normalizer.getData(), m_Normalizer.getDataConst(), num, YAMATH::EFE_InverseAndMultiply, 1.0f);
     }
 
-    void CRBMLayer::DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch)
+    void CRBMLayerGpu::DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch)
     {
         //msgG("inBatch:", inBatch);
         DeConvolveRaw(inBatch, outBatch);
@@ -394,7 +192,7 @@ namespace CRBM
         //msgG("outBatch (normalized):", outBatch);
     }
 
-    void CRBMLayer::DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
+    void CRBMLayerGpu::DeConvolveRaw(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         //horizontal and vertical number of patches
         int nh, nv;
@@ -437,7 +235,7 @@ namespace CRBM
     }
 
     //all parameters are from this layer
-    void CRBMLayer::RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
+    void CRBMLayerGpu::RawOutput2UpperLayer(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         //horizontal and vertical number of patches
         int nh, nv;
@@ -513,7 +311,7 @@ namespace CRBM
     }
 
     //all parameters are from this layer as well
-    void CRBMLayer::UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
+    void CRBMLayerGpu::UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
         //horizontal and vertical number of patches
         int nh, nv;
@@ -652,7 +450,7 @@ namespace CRBM
         return rr.getDataConst()[0]/(inW.getX()*inW.getY());
     }
 
-    float CRBMLayer::LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName, bool inputTransposed)
+    float CRBMLayerGpu::LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName, bool inputTransposed)
     {
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
@@ -716,7 +514,7 @@ namespace CRBM
         return error;
     }
 
-    float CRBMLayer::LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName)
+    float CRBMLayerGpu::LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName)
     {
         int transX, transY;//transformed size
         getConvolutionPatchesNumber(transX, transY);
@@ -749,7 +547,7 @@ namespace CRBM
         return error;
     }
 
-    float CRBMLayer::LearnBatch(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &inOutLastWeights)
+    float CRBMLayerGpu::LearnBatch(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &inOutLastWeights)
     {
         Timer timer;
 
@@ -858,7 +656,7 @@ namespace CRBM
         return error;
     }
 
-    void CRBMLayer::ActivationFunction(YAMATH::MatrixGpu &inData, int inFunctionType) const
+    void CRBMLayerGpu::ActivationFunction(YAMATH::MatrixGpu &inData, int inFunctionType) const
     {
         switch(inFunctionType)
         {
@@ -881,7 +679,7 @@ namespace CRBM
 #define T_I
 #define T_M(x)
 
-    void  CRBMLayer::Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const
+    void  CRBMLayerGpu::Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const
     {
         T_I;
         YAMATH::MatrixGpu x, y;
@@ -899,7 +697,7 @@ namespace CRBM
         T_M("Deconv");
     }
 
-    void CRBMLayer::Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData)
+    void CRBMLayerGpu::Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData)
     {
         YAMATH::MatrixGpu x, y;
 
@@ -917,198 +715,17 @@ namespace CRBM
         DeConvolve(x, outData);
     }
 
-    template<typename T>
-    void sv(std::ostream &out, const std::string &inName, const T &inValue)
-    {
-        out << inName;
-        out << " " << inValue << std::endl;
-    }
    
-    template<>
-    void sv<>(std::ostream &out, const std::string &inName, const YAMATH::MatrixGpu &inValue)
+    void CRBMLayerGpu::SaveSpecific(std::ostream &out) const
     {
-        out << inName << " ";
-        YAMATH::MatrixCpu m = inValue;
-        m.Save(out, true, 2);
-        out << std::endl;
-    }
-
-    template<typename T>
-    void checkVal(const T &wanted, const T &got, const std::string &name = "")
-    {
-        if(wanted != got)
-        {
-            std::stringstream e;
-            if(name != "")
-            {
-                e << "in [" << name << "]";
-            }
-            e << "wanted [" << wanted << "] but got [" << got << "]" << std::endl;
-
-            throw std::runtime_error(e.str());
-        }
-    }
-
-    template<typename T>
-    void checkValRange(const T &wantedMin, const T &wantedMax, const T &got, const std::string &name = "")
-    {
-        if(got < wantedMin || got > wantedMax)
-        {
-            std::stringstream e;
-            if(name != "")
-            {
-                e << "in [" << name << "]";
-            }
-            e << "wanted [" << wantedMin << " .. " << wantedMax << "] but got [" << got << "]" << std::endl;
-
-            throw std::runtime_error(e.str());
-        }
-    }
-
-    template<typename T>
-    void lvc(std::istream &in, const std::string &inName, const T &inMinValue, const T &inMaxValue, T &outValue)
-    {
-        std::string name;
-        in >> name >> outValue;
-        checkVal(inName, name);
-        checkValRange(inMinValue, inMaxValue, outValue, inName);
-    }
-
-    template<typename T>
-    void lv(std::istream &in, const std::string &inName, T &outValue)
-    {
-        std::string name;
-        in >> name >> outValue;
-        
-        checkVal(inName, name);
-    }
-   
-    template<>
-    void lv<>(std::istream &in, const std::string &inName, YAMATH::MatrixGpu &outValue)
-    {
-        std::string name;
-        in >> name;
-        in.ignore(1);
-        assert(name == inName);
-
-        YAMATH::MatrixCpu m;
-        m.Load(in);
-
-        outValue = m;
-    }
-
-    void CRBMLayer::Save(std::ostream &out) const
-    {
-        int version = 6;
-
-        sv(out, "CRBMLayer", version);
-
-        //1
-        sv(out, "learningSpeed", s().learningRate);
-
-        sv(out, "x", s().x);
-        sv(out, "y", s().y);
-        sv(out, "z", s().z);
-
-        sv(out, "cx", s().cx);
-        sv(out, "cy", s().cy);
-
-        sv(out, "stridex", s().stridex);
-        sv(out, "stridey", s().stridey);
-
-        sv(out, "hidden", s().hidden);
-
         sv(out, "weights", m_Weights);
-
-        //2
-        sv(out, "activationFunctionH", s().activationFunctionH);
-        sv(out, "activationFunctionV", s().activationFunctionV);
-
-        //3
-        sv(out, "decayRate", s().decayRate);
-
-        //4
-        sv(out, "saveInterval", s().saveInterval);
-        sv(out, "incrementalSave", s().incrementalSave);
-        sv(out, "incrementalSaveStart", s().incrementalSaveStart);
-
-        //5 matrix versioning
-
-        //6
-        sv(out, "momentum", s().momentum);
     }
 
-    void CRBMLayer::Load(std::istream &in)
+    void CRBMLayerGpu::LoadSpecific(std::istream &in)
     {
-        int version = -1;
-        int minVersion = 1;
-        int maxVersion = 6;
-        lvc(in, "CRBMLayer", minVersion, maxVersion, version);
-
-        lv(in, "learningSpeed", m_Setting.learningRate);
-
-        lv(in, "x", m_Setting.x);
-        lv(in, "y", m_Setting.y);
-        lv(in, "z", m_Setting.z);
-
-        lv(in, "cx", m_Setting.cx);
-        lv(in, "cy", m_Setting.cy);
-
-        lv(in, "stridex", m_Setting.stridex);
-        lv(in, "stridey", m_Setting.stridey);
-
-        lv(in, "hidden", m_Setting.hidden);
-
         lv(in, "weights", m_Weights);
-        
-        if(version >= 2)
-        {
-            lv(in, "activationFunctionH", m_Setting.activationFunctionH);
-            lv(in, "activationFunctionV", m_Setting.activationFunctionV);
-        }
-
-        if(version >= 3)
-        {
-            lv(in, "decayRate", m_Setting.decayRate);
-        }
-
-        if(version >= 4)
-        {
-            lv(in, "saveInterval", m_Setting.saveInterval);
-            lv(in, "incrementalSave", m_Setting.incrementalSave);
-            lv(in, "incrementalSaveStart", m_Setting.incrementalSaveStart);
-        }
-        //5 - matrix version
-        //
-        if(version >= 6)
-        {
-            lv(in, "momentum", m_Setting.momentum);
-        }
     }
 
-    void CRBMLayer::Save(const std::string &inName) const
-    {
-        std::cout << "saving [" << inName << "] ... " << std::flush;
-        Timer t;
-
-        std::ofstream f(inName.c_str(), std::ios::binary);
-        Save(f);
-        f.close();
-
-        t.tac();
-    }
-
-    void CRBMLayer::Load(const std::string &inName)
-    {
-        std::cout << "Loading RBM layer [" << inName << "] ... " << std::flush;
-        Timer t;
-
-        std::ifstream f(inName.c_str(), std::ios::binary);
-        Load(f);
-        f.close();
-
-        t.tac();
-    }
 }//namespace CRBM
 
-#endif //CRBM_H
+#endif //CRBMGPU_H

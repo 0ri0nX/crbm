@@ -38,6 +38,14 @@ namespace YAMATH
             Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
         }
 
+    MatrixCpu &MatrixCpu::operator=(float inVal)
+    {
+        for(t_index i = 0; i < getX()*getY(); ++i)
+        {
+            getData()[i] = inVal;
+        }
+    }
+
     MatrixCpu &MatrixCpu::operator=(const MatrixCpu &inMatrix)
     {
         if(this != &inMatrix)
@@ -152,7 +160,7 @@ namespace YAMATH
             hs >> outX >> outY;
         }
         
-        std::cout << "v=" << outVersion << "x=" << outX << ", y=" << outY << std::endl;
+        std::cout << "version= " << outVersion << ", size= " << outX << " x " << outY << std::endl;
 
         return inStream;
     }
@@ -454,6 +462,8 @@ namespace YAMATH
                 , 1.0f, inA.getDataConst(), inA.getX()
                 , inB.getDataConst(), inB.getX()
                 , 0.0f, outMatrix.getDataConst(), x);
+
+        return outMatrix;
     }
 }
 

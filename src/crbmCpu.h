@@ -102,6 +102,7 @@ namespace CRBM
         {
             return;
         }
+        //cout << " numImages=" << numImages << ", x=" << s().x << ", y=" << s().y << ", z=" << s().z << endl;
 
         m_Normalizer.Reset(numImages , s().x*s().y*s().z);
         m_Normalizer = 0.0f;

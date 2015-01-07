@@ -107,7 +107,7 @@ int main(int argc, char** argv)
     MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
     //f << rows << " " << resSize << endl;
 
-    MatrixCpu xxCpu, xx, xxTrans;
+    MatrixCpu xx, xxTrans;
     MatrixCpu tmpxx;
     timer.tic();
 
@@ -122,8 +122,7 @@ int main(int argc, char** argv)
 
         t_index actBatchSize = (batch != batchNum) ? batchSize : (rows - (batchNum-1)*batchSize);
 
-        xxCpu.LoadBatch(fdata, false, loadVersion, actBatchSize, cols, "");
-        xx = xxCpu;
+        xx.LoadBatch(fdata, false, loadVersion, actBatchSize, cols, "");
 
         //xx = xCpu->SubMatrix(a, 0, b, cols);
 

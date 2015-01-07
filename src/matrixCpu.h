@@ -268,6 +268,7 @@ namespace YAMATH
                 }
             }
 
+            MatrixCpu &operator=(float inVal);
             MatrixCpu &operator=(const MatrixGpu &inMatrix);
             MatrixCpu &operator=(const MatrixCpu &inMatrix);
 

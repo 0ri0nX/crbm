@@ -15,11 +15,11 @@ if len(sys.argv) < 2:
 instance = c.CRBMComputer([
         "testWeights/img-batch2.0.rbm",
         "testWeights/img-batch2.0.transformed.rbm",
-        "testWeights/img-batch2.0.transformed.transformed.rbm",
-        "testWeights/img-batch2.0.transformed.transformed.transformed.rbm",
-        "testWeights/img-batch2.0.transformed.transformed.transformed.transformed.rbm",
-        "testWeights/img-batch2.0.transformed.transformed.transformed.transformed.transformed.rbm",
-        "testWeights/img-batch2.0.transformed.transformed.transformed.transformed.transformed.transformed.rbm",
+        #"testWeights/img-batch2.0.transformed.transformed.rbm",
+        #"testWeights/img-batch2.0.transformed.transformed.transformed.rbm",
+        #"testWeights/img-batch2.0.transformed.transformed.transformed.transformed.rbm",
+        #"testWeights/img-batch2.0.transformed.transformed.transformed.transformed.transformed.rbm",
+        #"testWeights/img-batch2.0.transformed.transformed.transformed.transformed.transformed.transformed.rbm",
         #"testWeights/img-batch2.0.transformed.transformed.transformed.transformed.transformed.transformed.transformed.rbm"
         ], 1)
 

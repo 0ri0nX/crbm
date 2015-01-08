@@ -14,10 +14,11 @@ crbmComputerCpu.o: crbmComputer.cu crbmComputer.h
 	g++ -std=c++0x -fPIC -c -o $@ crbmComputer.cpp -g
 
 matrixCpu.o: ../src/matrixCpu.cpp ../src/matrixCpu.h
-	g++ -std=c++0x -fPIC -c -o matrixCpu.o ../src/matrixCpu.cpp -g
+	g++ -std=c++0x -fPIC -c -o $@ $< -g
 
 %.o: %.cpp
 	g++ -std=c++0x -fPIC -c -o $@ $^ -g
+
 %.o: %.cu
 	nvcc --gpu-architecture=sm_35 -Xcompiler '-fPIC' -D CUDA -c -o $@ $^ -g
 

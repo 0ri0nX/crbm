@@ -28,20 +28,21 @@ names = []
 for i in sys.argv[1:]:
     ss = time.time()
     try:
-        x=Image.open(i.strip())
+        x = Image.open(i.strip())
+        x = x.resize((200, 200))
+        x = x.convert("RGB")
     except:
         continue
 
-    x=x.resize((200, 200))
+    d = n.array(x.getdata())
+    d = (d/255.0).flatten().tolist() #normalize data
 
-    d=n.array(x.getdata())
-    d=(d/255.0).flatten()
-    d = d.tolist()
     batch.append(d)
     names.append(i)
 
     print "Preparation:", time.time() - ss
 
+    #example of transformation of only one image
     z = instance.transform(d)
 
     print i, z[:10] 
@@ -49,12 +50,8 @@ for i in sys.argv[1:]:
 if len(batch) > 0:
     batchX = n.array(batch).transpose().flatten().tolist()
     
-    print len(batchX)
-    #print batchX
-    
-    bb=instance.transformBatch(batchX)
-    bb = list(bb)
-    
+    bb = list(instance.transformBatch(batchX))
+
     batchY = n.array(bb).reshape(instance.outputNum, len(bb)/instance.outputNum).transpose()
     
     for i, name in enumerate(names):

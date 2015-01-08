@@ -1,6 +1,8 @@
 import ctypes
 import pkg_resources
-lib = ctypes.cdll.LoadLibrary(pkg_resources.resource_filename(__name__, 'libcrbmcomputer.so'))
+
+lib = ctypes.cdll.LoadLibrary(pkg_resources.resource_filename(__name__, 'libcrbmcomputercpu.so'))
+
 lib_CRBMStack_new = lib.CRBMStack_new
 lib_CRBMStack_delete = lib.CRBMStack_delete
 lib_CRBMStack_Transform = lib.CRBMStack_Transform
@@ -14,9 +16,9 @@ lib_CRBMStack_GetInputSize.restype = ctypes.c_int
 
 class CRBMComputer(object):
 
-    def __init__(self, crbmsFiles, gpu = 0):
+    def __init__(self, crbmsFiles, device = 0):
         TStringList = ctypes.c_char_p * len(crbmsFiles)
-        self.crbm = lib_CRBMStack_new(ctypes.c_int(len(crbmsFiles)), TStringList(*crbmsFiles), ctypes.c_int(gpu))
+        self.crbm = lib_CRBMStack_new(ctypes.c_int(len(crbmsFiles)), TStringList(*crbmsFiles), ctypes.c_int(device))
         self.outputNum = lib_CRBMStack_GetOutputSize(self.crbm)
         self.inputNum = lib_CRBMStack_GetInputSize(self.crbm)
 

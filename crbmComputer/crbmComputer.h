@@ -4,19 +4,27 @@
 #include <vector>
 #include <string>
 
+
 namespace CRBM
 {
+#ifdef CUDA
     class CRBMLayerGpu;
+    typedef CRBMLayerGpu TLayer;
+#else
+    class CRBMLayerCpu;
+    typedef CRBMLayerCpu TLayer;
+#endif
 }
 
 class CRBMStack
 {
     private:
-        std::vector<CRBM::CRBMLayerGpu*> m_Layers;
+        //std::vector<CRBM::CRBMLayerGpu*> m_Layers;
+        std::vector<CRBM::TLayer*> m_Layers;
 
     public:
-        CRBMStack(const std::vector<std::string> &inRBMFiles, int inGpuID = 0);
-        CRBMStack(int inLength, const char** inRBMFiles, int inGpuID = 0);
+        CRBMStack(const std::vector<std::string> &inRBMFiles, int inDeviceID = 0);
+        CRBMStack(int inLength, const char** inRBMFiles, int inDeviceID = 0);
 
         int GetOutputSize(void) const;
         int GetInputSize(void) const;

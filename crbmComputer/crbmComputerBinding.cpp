@@ -2,9 +2,9 @@
 
 extern "C"
 {
-    CRBMStack* CRBMStack_new(int inLength, const char** inWeights, int inGpuID)
+    CRBMStack* CRBMStack_new(int inLength, const char** inWeights, int inDeviceID)
     {
-        return new CRBMStack(inLength, inWeights, inGpuID);
+        return new CRBMStack(inLength, inWeights, inDeviceID);
     }
 
     int CRBMStack_GetOutputSize(CRBMStack* inCRBMStack)

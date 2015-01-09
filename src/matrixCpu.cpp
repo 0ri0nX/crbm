@@ -58,6 +58,7 @@ namespace YAMATH
   
     void MatrixCpu::Sample(t_index inRowsNum, MatrixCpu &outSample) const
     {
+#ifndef SQUEEZE
         outSample.Reset(inRowsNum, getY());
   
         std::random_device randomDevice;
@@ -72,10 +73,14 @@ namespace YAMATH
                 outSample.set(i, j, get(randomRow, j));
             }
         }
+#else
+        assert(0);
+#endif
     }
   
     void MatrixCpu::SampleCols(t_index inColsNum, MatrixCpu &outSample) const
     {
+#ifndef SQUEEZE
         t_index randomCol[inColsNum];
   
         outSample.Reset(getX(), inColsNum);
@@ -110,6 +115,9 @@ namespace YAMATH
                 madvise(getDataConst() + randomCol[i]*getX(), getX()*sizeof(float), MADV_NORMAL);
             }
         }
+#else
+        assert(0);
+#endif
     }
 
     void printProgress(int act, int max)

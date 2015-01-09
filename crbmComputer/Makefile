@@ -14,7 +14,7 @@ crbmComputerCpu.o: crbmComputer.cu crbmComputer.h
 	g++ -std=c++0x -fPIC -c -o $@ crbmComputer.cpp -g
 
 matrixCpu.o: ../src/matrixCpu.cpp ../src/matrixCpu.h
-	g++ -std=c++0x -fPIC -c -o $@ $< -g
+	g++ -std=c++0x -fPIC -c -o $@ $< -g -D SQUEEZE
 
 %.o: %.cpp
 	g++ -std=c++0x -fPIC -c -o $@ $^ -g

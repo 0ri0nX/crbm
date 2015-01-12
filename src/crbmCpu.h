@@ -70,19 +70,30 @@ namespace CRBM
 
         outBatch.Reset(totImages , s().cx*s().cy*s().z);
 
-        //TODO: remove, only for tesst
-        //outBatch = -1.0;
+#define TT_I Timer TTT;
+#define TT_M(x) TTT.tac(x ": "); TTT.tic();
 
-        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+        //99 3 4 1 2 5     worst
+        //45629 5 4 2 1 3  best
+        //TT_I;
+        std::cout << std::endl;
+        for(int az = 0; az < s().z; ++az)//image layers //5
         {
-            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+            for(int ax = 0; ax < s().cx; ++ax)//x in convolution window //4
             {
-                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window
+                for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x //2
                 {
-                    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window
+                    for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y //1
                     {
-                        for(int az = 0; az < s().z; ++az)//image layers
+                        for(int ay = 0; ay < s().cy; ++ay)//y in convolution window //3
                         {
+                            //std::cout << pixelInColMajor(s().stridex*px + ax, s().stridey*py + ay, az, 0, s().x, s().y, s().z, numImages);
+                            //std::cout << " " << py;
+                            //std::cout << " " << px;
+                            //std::cout << " " << ay;
+                            //std::cout << " " << ax;
+                            //std::cout << " " << az;
+                            //std::cout << std::endl;
                             memcpy
                                 (outBatch.getData()  + pixelInColMajor(ax, ay, az, px*numImages + py*nh*numImages, s().cx, s().cy, s().z, totImages) //convolution window target
                                      , inBatch.getDataConst() + pixelInColMajor(s().stridex*px + ax, s().stridey*py + ay, az, 0, s().x, s().y, s().z, numImages) //convolution window source
@@ -93,6 +104,8 @@ namespace CRBM
                 }
             }
         }
+
+        //TT_M("Total measured time")
     }
 
     void CRBMLayerCpu::SetDeConvolveNormalizer(int numImages)
@@ -223,10 +236,14 @@ namespace CRBM
         //cout << "patches:" << numPatches << std::endl;
         //cout << "features:" << features << std::endl;
         //cout << "images:" << numImages << std::endl;
+        
+        //best 1 2
+        //worst 2 1
 
-        for(int p = 0; p < numPatches; ++p)//p - patch number
+        //TT_I;
+        for(int p = 0; p < numPatches; ++p)//p - patch number //1
         {
-            for(int f = 0; f < features; ++f)//f - number of features (hidden layer)
+            for(int f = 0; f < features; ++f)//f - number of features (hidden layer) //2
             {
                         {
                             memcpy
@@ -238,6 +255,7 @@ namespace CRBM
                         }
             }
         }
+        //TT_M("Total measured time RawOutput2UpperLayer()")
     }
 
     //all parameters are from this layer as well

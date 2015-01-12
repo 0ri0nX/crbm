@@ -6,6 +6,9 @@
 #include <string>
 #include <iostream>
 
+//#define LOAD_VERBOSITY 2
+#define LOAD_VERBOSITY 1
+
 //helper class for timing
 class Timer
 {
@@ -38,14 +41,19 @@ class Timer
 
 void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false, const std::string &inCacheFileName = "")
 {
+#if LOAD_VERBOSITY > 1
     std::cout << "loading [" << filename << "] ... " << std::flush;
     Timer t;
+#endif
+
     std::ifstream f(filename.c_str());
     inM.Load(f, inTransposed, inCacheFileName);
     f.close();
+
+#if LOAD_VERBOSITY > 1
     std::cout << inM.getX() << " x " << inM.getY() << "  ";
     t.tac();
-    //msgC(filename.c_str(), inM);
+#endif
 }
 
 void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
@@ -56,7 +64,6 @@ void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
     inM.Save(f);
     f.close();
     t.tac();
-    //msgC(filename.c_str(), inM);
 }
 
 //save to stream
@@ -103,32 +110,56 @@ void checkValRange(const T &wantedMin, const T &wantedMax, const T &got, const s
 template<typename T>
 void lvc(std::istream &in, const std::string &inName, const T &inMinValue, const T &inMaxValue, T &outValue)
 {
+#if LOAD_VERBOSITY > 1
+    std::cout << "Loading [" << inName << "] ..." << std::flush;
+#endif
+
     std::string name;
     in >> name >> outValue;
     checkVal(inName, name);
     checkValRange(inMinValue, inMaxValue, outValue, inName);
+
+#if LOAD_VERBOSITY > 1
+    std::cout << " done" << std::endl;
+#endif
 }
 
 //load from stream
 template<typename T>
 void lv(std::istream &in, const std::string &inName, T &outValue)
 {
+#if LOAD_VERBOSITY > 1
+    std::cout << "Loading [" << inName << "] ..." << std::flush;
+#endif
+
     std::string name;
     in >> name >> outValue;
     
     checkVal(inName, name);
+
+#if LOAD_VERBOSITY > 1
+    std::cout << " done" << std::endl;
+#endif
 }
  
 //load from stream (cpu matrix)
 template<>
 void lv<>(std::istream &in, const std::string &inName, YAMATH::MatrixCpu &outValue)
 {
+#if LOAD_VERBOSITY > 1
+    std::cout << "Loading [" << inName << "] ..." << std::flush;
+#endif
+
     std::string name;
     in >> name;
     in.ignore(1);
     assert(name == inName);
 
     outValue.Load(in);
+
+#if LOAD_VERBOSITY > 1
+    std::cout << " done" << std::endl;
+#endif
 }
 
 //save to stream (cpu matrix)

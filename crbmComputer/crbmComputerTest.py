@@ -6,8 +6,6 @@ import numpy as n
 
 import time
 
-#instance = c.CRBMComputer(["../dataConv/data5-5k-200x200x3.txt.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.rbm", "../dataConv/data5-5k-200x200x3.txt.transformed.transformed.transformed.transformed.transformed.rbm"], 1)
-
 if len(sys.argv) < 2:
     print "Syntax:", sys.argv[0], "[image 1] ... [image N]"
     exit(1)
@@ -43,18 +41,20 @@ for i in sys.argv[1:]:
     print "Preparation:", time.time() - ss
 
     #example of transformation of only one image
-    z = instance.transform(d)
+    if False:
+        z = instance.transform(d)
 
-    print i, z[:10] 
+        print i, z
 
 if len(batch) > 0:
     batchX = n.array(batch).transpose().flatten().tolist()
-    
+
+    #example of batch transformation 
     bb = list(instance.transformBatch(batchX))
 
     batchY = n.array(bb).reshape(instance.outputNum, len(bb)/instance.outputNum).transpose()
     
     for i, name in enumerate(names):
-        print name, batchY[i, :10]
+        print batchY[i], "#", name
 
 

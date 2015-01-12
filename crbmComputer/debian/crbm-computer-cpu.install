@@ -1,0 +1,2 @@
+libcrbmcomputercpu.so /usr/lib/
+crbmComputer.py /usr/share/pyshared/

@@ -1,0 +1,3 @@
+testWeights/img-batch2.0.rbm /usr/share/crbmcomputer/examples/testWeights/
+testWeights/img-batch2.0.transformed.rbm /usr/share/crbmcomputer/examples/testWeights/
+crbmComputerTest.py /usr/share/crbmcomputer/examples/

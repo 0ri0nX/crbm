@@ -1,7 +1,8 @@
 import ctypes
 import pkg_resources
 
-lib = ctypes.cdll.LoadLibrary(pkg_resources.resource_filename(__name__, 'libcrbmcomputercpu.so'))
+#lib = ctypes.cdll.LoadLibrary(pkg_resources.resource_filename(__name__, 'libcrbmcomputercpu.so'))
+lib = ctypes.cdll.LoadLibrary('libcrbmcomputercpu.so')
 
 lib_CRBMStack_new = lib.CRBMStack_new
 lib_CRBMStack_delete = lib.CRBMStack_delete

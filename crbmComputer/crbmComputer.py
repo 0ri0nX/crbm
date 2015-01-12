@@ -5,15 +5,30 @@ import pkg_resources
 lib = ctypes.cdll.LoadLibrary('libcrbmcomputercpu.so')
 
 lib_CRBMStack_new = lib.CRBMStack_new
+lib.CRBMStack_new.restype = ctypes.c_void_p
+
 lib_CRBMStack_delete = lib.CRBMStack_delete
+lib_CRBMStack_delete.argtypes = [ctypes.c_void_p]
+
 lib_CRBMStack_Transform = lib.CRBMStack_Transform
+lib_CRBMStack_Transform.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+
 lib_CRBMStack_TransformBatch = lib.CRBMStack_TransformBatch
+lib_CRBMStack_TransformBatch.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+
 lib_CRBMStack_Reconstruct = lib.CRBMStack_Reconstruct
+lib_CRBMStack_Reconstruct.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+
 lib_CRBMStack_ReconstructBatch = lib.CRBMStack_ReconstructBatch
+lib_CRBMStack_ReconstructBatch.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+
 lib_CRBMStack_GetOutputSize = lib.CRBMStack_GetOutputSize
 lib_CRBMStack_GetOutputSize.restype = ctypes.c_int
+lib_CRBMStack_GetOutputSize.argtypes = [ctypes.c_void_p]
+
 lib_CRBMStack_GetInputSize = lib.CRBMStack_GetInputSize
 lib_CRBMStack_GetInputSize.restype = ctypes.c_int
+lib_CRBMStack_GetInputSize.argtypes = [ctypes.c_void_p]
 
 class CRBMComputer(object):
 

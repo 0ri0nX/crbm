@@ -9,4 +9,5 @@ prerequisites for for running test:
   - python >= 2.6.6
   - python-imaging >= 1.1.7
 
-
+For creating debian package call dpkg-buildpackage in this directory.
+It works on debian squeeze and higher.

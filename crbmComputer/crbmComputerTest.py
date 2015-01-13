@@ -3,7 +3,7 @@ import sys
 import crbmComputer as c
 from PIL import Image
 import numpy as n
-
+import pkg_resources
 import time
 
 if len(sys.argv) < 2:
@@ -11,8 +11,8 @@ if len(sys.argv) < 2:
     exit(1)
 
 instance = c.CRBMComputer([
-        "testWeights/img-batch2.0.rbm",
-        "testWeights/img-batch2.0.transformed.rbm",
+        pkg_resources.resource_filename(__name__, "testWeights/img-batch2.0.rbm"),
+        pkg_resources.resource_filename(__name__, "testWeights/img-batch2.0.transformed.rbm"),
         #"testWeights/img-batch2.0.transformed.transformed.rbm",
         #"testWeights/img-batch2.0.transformed.transformed.transformed.rbm",
         #"testWeights/img-batch2.0.transformed.transformed.transformed.transformed.rbm",

@@ -23,7 +23,7 @@ fidx = 0
 
 fs = "<" + "B"*(size[0]*size[1]*3)
 
-while len(data) > limit:
+while len(data) >= limit:
 
     f=open(sys.argv[1] + "." + str(fidx), "wb")
     fInfo=open(sys.argv[1] + "." + str(fidx) + ".info", "w")
@@ -35,7 +35,9 @@ while len(data) > limit:
     
     
     idx = 0
+    used = 0
     for iii in data:
+        used += 1
         if idx >= limit:
             break
 
@@ -48,6 +50,8 @@ while len(data) > limit:
         
             d = (np.array(ii.getdata())).flatten().tolist()
         except:
+            sys.stderr.write("Skipping [" + iii + "]\n")
+            sys.stderr.flush()
             continue
     
         assert len(d) == size[0]*size[1]*3
@@ -68,5 +72,5 @@ while len(data) > limit:
     f.close()
     fInfo.close()
 
-    data = data[idx:]
+    data = data[used:]
 

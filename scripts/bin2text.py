@@ -35,9 +35,9 @@ def bin2txtVer2(filename, targetFilename):
                     raise
                 fOut.write(" ".join(map(str, r)) + "\n")
 
-                sys.stdout.write(str(i) + "\r")
+                sys.stdout.write(str(i+1) + "\r")
                 sys.stdout.flush()
-            sys.stdout.write(str(i) + "\n")
+            sys.stdout.write(str(i+1) + "\n")
 
 def bin2txtVer1(filename, targetFilename):
     "version 1 to version 0"
@@ -69,9 +69,9 @@ def bin2txtVer1(filename, targetFilename):
                 r = map(lambda x:x/255.0, r)
                 fOut.write(" ".join(map(str, r)) + "\n")
 
-                sys.stdout.write(str(i) + "\r")
+                sys.stdout.write(str(i+1) + "\r")
                 sys.stdout.flush()
-            sys.stdout.write(str(i) + "\n")
+            sys.stdout.write(str(i+1) + "\n")
 
 if len(sys.argv) != 3:
     print sys.argv[0], "<binary-in-file> <text-out-file>"

@@ -70,23 +70,28 @@ namespace CRBM
 
         outBatch.Reset(totImages , s().cx*s().cy*s().z);
 
-#define TT_I Timer TTT;
-#define TT_M(x) TTT.tac(x ": "); TTT.tic();
-
-        //99 3 4 1 2 5     worst
-        //45629 5 4 2 1 3  best
-        //TT_I;
-        std::cout << std::endl;
-        for(int az = 0; az < s().z; ++az)//image layers //5
+        //99 3 4 1 2 5     one extreme
+        for(int ay = 0; ay < s().cy; ++ay)//y in convolution window //3
         {
             for(int ax = 0; ax < s().cx; ++ax)//x in convolution window //4
             {
-                for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x //2
+                for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y //1
                 {
-                    for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y //1
+                    for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x //2
                     {
-                        for(int ay = 0; ay < s().cy; ++ay)//y in convolution window //3
+                        for(int az = 0; az < s().z; ++az)//image layers //5
                         {
+        //45629 5 4 2 1 3  second extreme
+        //for(int az = 0; az < s().z; ++az)//image layers //5
+        //{
+        //    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window //4
+        //    {
+        //        for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x //2
+        //        {
+        //            for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y //1
+        //            {
+        //                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window //3
+        //                {
                             //std::cout << pixelInColMajor(s().stridex*px + ax, s().stridey*py + ay, az, 0, s().x, s().y, s().z, numImages);
                             //std::cout << " " << py;
                             //std::cout << " " << px;
@@ -104,8 +109,6 @@ namespace CRBM
                 }
             }
         }
-
-        //TT_M("Total measured time")
     }
 
     void CRBMLayerCpu::SetDeConvolveNormalizer(int numImages)
@@ -359,6 +362,7 @@ namespace CRBM
     {
         T_I;
         YAMATH::MatrixCpu x, y;
+        T_M("\nInit");
 
         Convolve(inData, x);
         T_M("Conv");

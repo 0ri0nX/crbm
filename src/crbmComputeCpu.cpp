@@ -45,13 +45,14 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    int batchSize = 500;
+    int batchSize = 1000;
 
     cout << "Maximal batch size: " << batchSize << endl;
 
     MatrixCpu xCpu;
 
     Timer timer;
+    Timer timer2;
     t_index cols = 0;
     t_index rows = 0;
     int loadVersion = -1;
@@ -136,14 +137,17 @@ int main(int argc, char** argv)
 
         MatrixCpu y;
 
+        timer.tic();
+        timer2.tic();
         for(int i = 0; i < layers.size(); ++i)
         {
             timer.tic();
             cout << "   Transforming with layer " << i+1 << flush;
             layers[i]->Transform(xx, y);
-            timer.tac(" ");
             xx = y;
+            timer.tac(" ");
         }
+        timer2.tac("  All layers: ");
 
         if(computationType == "transform")
         {

@@ -81,7 +81,7 @@ namespace CRBM
 
 #ifdef STREAMS_ON
         // allocate and initialize an array of stream handles
-        int nstreams = 14;
+        int nstreams = 2;
         std::cout << "async " << nstreams << std::endl;
         cudaStream_t *streams = (cudaStream_t*) malloc(nstreams * sizeof(cudaStream_t));
         for(int i = 0; i < nstreams; i++)
@@ -91,19 +91,30 @@ namespace CRBM
         int indexForStream = 0;
 #endif //STREAMS_ON
 
-        //TODO: remove, only for tesst
-        //outBatch = -1.0;
-
-        for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y
+        //99 3 4 1 2 5     one extreme
+        for(int ay = 0; ay < s().cy; ++ay)//y in convolution window //3
         {
-            for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x
+            for(int ax = 0; ax < s().cx; ++ax)//x in convolution window //4
             {
-                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window
+                for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y //1
                 {
-                    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window
+                    for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x //2
                     {
-                        for(int az = 0; az < s().z; ++az)//image layers
+                        for(int az = 0; az < s().z; ++az)//image layers //5
                         {
+        //45629 5 4 2 1 3  next extreme
+        //for(int az = 0; az < s().z; ++az)//image layers //5
+        //{
+        //    for(int ax = 0; ax < s().cx; ++ax)//x in convolution window //4
+        //    {
+        //        for(int px = 0; px < nh; ++px)//x - order of convolution window - patch x //2
+        //        {
+        //            for(int py = 0; py < nv; ++py)//y - order of convolution window - patch y //1
+        //            {
+        //                for(int ay = 0; ay < s().cy; ++ay)//y in convolution window //3
+        //                {
+        
+
 #ifdef STREAMS_ON
                             cudaMemcpyAsync
 #else //STREAMS_ON
@@ -119,13 +130,11 @@ namespace CRBM
 #endif //STREAMS_ON
 
                                      );
-                            //goto breakit;
                         }
                     }
                 }
             }
         }
-//breakit:
 
 #ifdef STREAMS_ON
         // release resources
@@ -674,7 +683,7 @@ namespace CRBM
     }
 
 //#define T_I Timer TTT;
-//#define T_M(x) TTT.tac(x ": "); TTT.tic();
+//#define T_M(x) cudaDeviceSynchronize(); TTT.tac(x ": "); TTT.tic();
 
 #define T_I
 #define T_M(x)
@@ -683,6 +692,7 @@ namespace CRBM
     {
         T_I;
         YAMATH::MatrixGpu x, y;
+        T_M("\nInit");
 
         Convolve(inData, x);
         T_M("Conv");

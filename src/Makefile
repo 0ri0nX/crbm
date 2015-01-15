@@ -7,13 +7,13 @@ all: crbmComputeGpu crbmGpu crbmComputeCpu
 	nvcc --gpu-architecture=sm_35  -c -o $@ -O3 -D CUDA -g $<
 
 %.o: %.cpp crbmCpu.h crbm.h Makefile matrix.h matrixCpu.h
-	g++ -std=c++0x -c -o $@ -O3 -g $<
+	g++ -std=c++0x -c -o $@ -O3 -D SQUEEZE -g $<
 
 test: test.cu matrix.h
 	nvcc -o test -D CUDA test.cu -lcublas -lcurand -D DEBUG
 
 crbmComputeCpu: matrixCpu.h utils.h crbm.h crbmCpu.h crbmComputeCpu.o Makefile matrixCpu.o
-	g++ -std=c++0x -o crbmComputeCpu -O3 crbmComputeCpu.o matrixCpu.o -lrt -lblas -g
+	g++ -std=c++0x -o crbmComputeCpu -O3 crbmComputeCpu.o matrixCpu.o -lrt -lblas -g -D SQUEEZE
 
 crbmGpu: matrix.h utils.h utilsGpu.h crbm.h crbmGpu.h crbmGpu.o Makefile matrixCpu.o
 	nvcc --gpu-architecture=sm_35 -o crbmGpu -O3 -D CUDA -lcuda -lcublas -lcurand -lcudart crbmGpu.o matrixCpu.o -lblas -g

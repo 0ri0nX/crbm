@@ -44,6 +44,9 @@ namespace CRBM
             activationFunctionV = 0;
 
             momentum = 0.0f;
+
+            noiseCenterRange = 0.0f;//computes mean and dev of data. center of noise is range (0-noiseCenterRange)*dev
+            noiseDevRange = 0.0f;//scale of noise is dev*noiseDevRange
     
             //momentum = 0.9f;
             //dataLimit = 0;
@@ -81,6 +84,8 @@ namespace CRBM
             activationFunctionH             = loadOption(f, "activationFunctionH",                      activationFunctionH);
             activationFunctionV             = loadOption(f, "activationFunctionV",                      activationFunctionV);
             momentum        = loadOption(f, "momentum",                     momentum);
+            noiseCenterRange= loadOption(f, "noiseCenterRange",             noiseCenterRange   );
+            noiseDevRange   = loadOption(f, "noiseDevRange",                noiseDevRange   );
         }
     
         //image-size
@@ -113,6 +118,8 @@ namespace CRBM
         int incrementalSave;
 
         float momentum;
+        float noiseCenterRange;
+        float noiseDevRange;
     };
 
 
@@ -234,7 +241,7 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        int version = 6;
+        int version = 7;
 
         sv(out, "CRBMLayer", version);
 
@@ -271,13 +278,17 @@ namespace CRBM
 
         //6
         sv(out, "momentum", s().momentum);
+
+        //7
+        sv(out, "noiseCenterRange", s().noiseCenterRange);
+        sv(out, "noiseDevRange", s().noiseDevRange);
     }
 
     void CRBMLayer::Load(std::istream &in)
     {
         int version = -1;
         int minVersion = 1;
-        int maxVersion = 6;
+        int maxVersion = 7;
         lvc(in, "CRBMLayer", minVersion, maxVersion, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
@@ -313,11 +324,18 @@ namespace CRBM
             lv(in, "incrementalSave", m_Setting.incrementalSave);
             lv(in, "incrementalSaveStart", m_Setting.incrementalSaveStart);
         }
+
         //5 - matrix version
-        //
+
         if(version >= 6)
         {
             lv(in, "momentum", m_Setting.momentum);
+        }
+
+        if(version >= 7)
+        {
+            lv(in, "noiseCenterRange", m_Setting.noiseCenterRange);
+            lv(in, "noiseDevRange", m_Setting.noiseDevRange);
         }
     }
 

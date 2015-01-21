@@ -865,6 +865,7 @@ int MatrixGpu::m_Allocations = 0;
 
     void testSum(const MatrixGpu& inA, MatrixGpu &outMatrix)
     {
+        assert(0);
     }
 
     class OperationMatrixAggregate : public OperationGpu

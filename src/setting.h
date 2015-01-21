@@ -21,6 +21,41 @@ struct SettingBase
     };
 
     template<typename T>
+    bool loadVal(std::stringstream &s, T &outData)
+    {
+        s >> outData;
+        if(!s.fail())
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    template<typename T>
+    bool loadVal(std::stringstream &s, std::vector<T> &outData)
+    {
+        while(s)
+        {
+            T val;
+            s >> val;
+
+            outData.push_back(val);
+        }
+
+        if(!s.fail())
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    template<typename T>
     T loadOption(std::ifstream &f, const char* inOption, T inDefault)
     {
         f.clear();
@@ -47,8 +82,9 @@ struct SettingBase
                 if(strcmp(buffer2, inOption) == 0)
                 {
                     T value;
-                    s >> value;
-                    if(!s.fail())
+                    loaded = loadVal(s, value);
+
+                    if(loaded)
                     {
                         res = value; 
                         loaded = true;

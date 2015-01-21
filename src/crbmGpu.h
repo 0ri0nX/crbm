@@ -560,13 +560,33 @@ namespace CRBM
     {
         Timer timer;
 
-        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, dw1a, dw2a;
+        YAMATH::MatrixGpu x, xraw, y, x2, y2, dw1, dw2, dw1a, dw2a, noise;
 
         //timer.tic();
         std::cout << "    Preparing data ... " << std::flush;
         testNan(inBatch);
         Convolve(inBatch, x);
         timer.tac();
+
+        float mean = 0.0f;
+        float dev = 0.0f;
+
+        if(s().noiseCenterRange > 0.0f || s().noiseDevRange > 0.0f)
+        {
+            //compute mean and dev
+
+            YAMATH::MatrixCpu tmpSum = YAMATH::MatrixGpu(x.Sum());
+            mean = tmpSum.getDataConst()[0] / (x.getX()*x.getY());
+            YAMATH::MatrixGpu diff = x-mean;
+            YAMATH::MatrixGpu squared = diff*diff;
+            YAMATH::MatrixCpu tmpDev = YAMATH::MatrixGpu(squared.Sum());
+            dev = tmpDev.getDataConst()[0] / (x.getX()*x.getY());
+
+            noise.Reset(x.getX(), x.getY());
+
+            //noiseCenterRange = 0.0f;//computes mean and dev of data. center of noise is range (0-noiseCenterRange)*dev
+            //noiseDevRange = 0.0f;//scale of noise is dev*noiseDevRange
+        }
 
         float weightSize = computeWeightSize(m_Weights);
         std::cout << "    Weights' size: [" << weightSize << "]" << std::endl;
@@ -579,12 +599,31 @@ namespace CRBM
         float error = -1.0f;
         std::cout << "    " << s().batchIterations << " iterations:" << std::flush;
 
+        YAMATH::MatrixCpu normalNoise(2,s().batchIterations);
+        normalNoise.RandNormal(0.0f, 1.0f);
+
         for(int i = 1; i <= s().batchIterations && !IsStopRequired(); ++i)
         {
             testNan(x);
             testNan(m_Weights);
-            y = Mult(x, m_Weights);
+            //add noise
+            if(s().noiseCenterRange > 0.0f || s().noiseDevRange > 0.0f)
+            {
+                float nCenter = normalNoise.get(0, i-1) * dev * s().noiseCenterRange;
+                float nDev = normalNoise.get(1, i-1) * dev * s().noiseDevRange;
+
+                noise.RandNormal(nCenter, nDev);
+                noise = noise + x;
+
+                //std::cout << "Noise enter: " << nCenter << ", noise dev: " << nDev << std::endl;
+                y = Mult(noise, m_Weights);
+            }
+            else
+            {
+                y = Mult(x, m_Weights);
+            }
             testNan(y);
+
             ActivationFunction(y, s().activationFunctionH);
             testNan(y);
 

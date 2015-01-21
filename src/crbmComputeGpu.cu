@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     if(argc < 5)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " <gpu-id> <reconstruct|transform> input-vector-file crbm-file1 [crbm-file2] ..." << endl;
+        cout << argv[0] << " <gpu-id> <reconstruct|transform|reconstructionError> input-vector-file crbm-file1 [crbm-file2] ..." << endl;
         exit(1);
     }
 
@@ -49,13 +49,18 @@ int main(int argc, char** argv)
     }
 
     string computationType = argv[2];
-    if(computationType != "reconstruct" && computationType != "transform")
+    if(computationType != "reconstruct" && computationType != "transform" && computationType != "reconstructionError")
     {
         cout << "Unsupported computation type: [" << computationType << "]" << endl;
         exit(1);
     }
 
     int batchSize = 1000;
+
+    if(computationType == "reconstructionError")
+    {
+        batchSize = 500;
+    }
 
     cout << "Maximal batch size: " << batchSize << endl;
 
@@ -101,9 +106,13 @@ int main(int argc, char** argv)
         resSize = cols;
     }
 
-    cout << "Saving into: [" << outFilename << "]" << endl;
+    ofstream f;
+    if(computationType != "reconstructionError")
+    {
+        cout << "Saving into: [" << outFilename << "]" << endl;
 
-    ofstream f(outFilename.c_str());
+        f.open(outFilename.c_str());
+    }
 
     int saveVersion = -1;
     if(computationType == "reconstruct")
@@ -115,8 +124,11 @@ int main(int argc, char** argv)
         saveVersion = 2;
     }
 
-    MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
-    //f << rows << " " << resSize << endl;
+    if(computationType != "reconstructionError")
+    {
+        MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
+        //f << rows << " " << resSize << endl;
+    }
 
     MatrixCpu xxCpu;
     Mat xx, xxTrans;
@@ -179,6 +191,12 @@ int main(int argc, char** argv)
             xx = y;
         }
 
+        if(computationType == "reconstructionError" || computationType == "reconstruct")
+        {
+            float error = CRBM::computeError(xx, xxCpu);
+            cout << "   Error = " << error << endl;
+        }
+
         if(computationType == "reconstruct")
         {
             timer.tic();
@@ -189,8 +207,11 @@ int main(int argc, char** argv)
         }
     }
 
-    f.close();
-    cout << "Saved into: [" << outFilename << "]" << endl;
+    if(computationType != "reconstructionError")
+    {
+        f.close();
+        cout << "Saved into: [" << outFilename << "]" << endl;
+    }
 
     return 0;
 }

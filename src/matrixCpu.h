@@ -30,7 +30,7 @@ namespace YAMATH
     {
         public:
             MatrixCpu(t_index inX = 1, t_index inY = 1, const float * inInit = NULL, std::string inCacheFileName = "") //column first order
-                : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileName(inCacheFileName), m_FileCache(-1)
+                : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileName(inCacheFileName), m_FileCache(-1), m_FileCacheOffset(0)
             {
                 Reset(inX, inY, inInit);
             }
@@ -124,26 +124,34 @@ namespace YAMATH
                 if(m_CacheFileName != "")
                 {
                     t_index fsize = inDataSize*sizeof(float);
-                    int result = lseek(m_FileCache, fsize, SEEK_SET);
-                    if (result == -1)
-                    {
-                        close(m_FileCache);
-                        throw std::runtime_error("Error calling lseek() to 'stretch' the file");
-                    }
-                    char testData[getCachedTestSize()];
 
-                    ssize_t size = read(m_FileCache, testData, getCachedTestSize());
-                    
-                    if(size == getCachedTestSize())
-                    {
-                        bool ok = true;
-                        for(int i = 0; i < getCachedTestSize(); ++i)
-                        {
-                            ok = ok && testData[i] == '+';
-                        }
+                    struct stat st;
+                    fstat(m_FileCache, &st);
 
-                        return ok;
-                    }
+                    //simple check - if file is of the correct size (in the beginning file is greater by getCachedTestSize()
+
+                    return fsize == st.st_size;
+
+                    //int result = lseek(m_FileCache, fsize, SEEK_SET);
+                    //if (result == -1)
+                    //{
+                    //    close(m_FileCache);
+                    //    throw std::runtime_error("Error calling lseek() to 'stretch' the file");
+                    //}
+                    //char testData[getCachedTestSize()];
+
+                    //ssize_t size = read(m_FileCache, testData, getCachedTestSize());
+                    //
+                    //if(size == getCachedTestSize())
+                    //{
+                    //    bool ok = true;
+                    //    for(int i = 0; i < getCachedTestSize(); ++i)
+                    //    {
+                    //        ok = ok && testData[i] == '+';
+                    //    }
+
+                    //    return ok;
+                    //}
                 }
 
                 return false;
@@ -153,22 +161,43 @@ namespace YAMATH
                 if(m_CacheFileName != "")
                 {
                     t_index size = inDataSize*sizeof(float);
-                    ssize_t result = lseek(m_FileCache, size, SEEK_SET);
-                    if (result == -1)
+
+                    struct stat st;
+                    fstat(m_FileCache, &st);
+
+                    if(st.st_size == size + getCachedTestSize())
                     {
-                        close(m_FileCache);
-                        throw std::runtime_error("Error calling lseek() to 'stretch' the file");
-                    }
-                    
-                    for(int i = 0; i < getCachedTestSize(); ++i)
-                    {
-                        result = write(m_FileCache, (yes) ? "+" : "-", 1);
+                        int result = ftruncate(m_FileCache, size);
                         if (result == -1)
                         {
                             close(m_FileCache);
-                            throw std::runtime_error("Error calling write() to the file");
+                            throw std::runtime_error("Error calling lseek() to 'stretch' the file");
                         }
                     }
+
+                    fstat(m_FileCache, &st);
+
+                    std::cout << "Real size: " << st.st_size << std::endl;
+                    std::cout << "Desired  : " << size << std::endl;
+
+                    assert(st.st_size == size);
+
+                    //ssize_t result = lseek(m_FileCache, size, SEEK_SET);
+                    //if (result == -1)
+                    //{
+                    //    close(m_FileCache);
+                    //    throw std::runtime_error("Error calling lseek() to 'stretch' the file");
+                    //}
+
+                    //for(int i = 0; i < getCachedTestSize(); ++i)
+                    //{
+                    //    result = write(m_FileCache, (yes) ? "+" : "-", 1);
+                    //    if (result == -1)
+                    //    {
+                    //        close(m_FileCache);
+                    //        throw std::runtime_error("Error calling write() to the file");
+                    //    }
+                    //}
 
                 }
             }
@@ -297,6 +326,7 @@ namespace YAMATH
             float *m_Data;
             std::string m_CacheFileName;
             int m_FileCache;
+            int m_FileCacheOffset;
     };
 
 }

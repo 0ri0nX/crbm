@@ -18,7 +18,7 @@ limit = int(sys.argv[2])
 batchLimit = int(sys.argv[3])
 #data = data[:limit]
 
-VERSION = 2
+VERSION = 3
 
 fidx = 0
 
@@ -28,8 +28,8 @@ if VERSION == 1:#bytes 0-255
 if VERSION == 2:#floats (0-255)/255.0
     fs = "<" + "f"*(size[0]*size[1]*3)
 
-#if VERSION == 3:#floats 0-255
-#    fs = "<" + "f"*(size[0]*size[1]*3)
+if VERSION == 3:#floats 0-255
+    fs = "<" + "f"*(size[0]*size[1]*3)
 
 idx = 0
 
@@ -90,8 +90,9 @@ def outputImageFinal(f, fInfo, ii, name):
         ii = ii.resize(size, im.ANTIALIAS)
 
     d = (np.array(ii.getdata())).flatten()
-    if VERSION == 2:
+    if VERSION == 2 or VERSION == 3:
         d = d.astype(float)
+        d /= 255.0
     d = d.tolist()
 
     assert len(d) == size[0]*size[1]*3
@@ -105,14 +106,30 @@ def outputImageFinal(f, fInfo, ii, name):
 while len(data)*10 >= limit and batchLimit > 0:
     batchLimit -= 1
 
-    f=open(sys.argv[1] + "." + str(fidx), "wb")
-    fInfo=open(sys.argv[1] + "." + str(fidx) + ".info", "w")
-    fidx += 1
+    if VERSION == 1 or VERSION == 2:
 
-    f.write("Matrix " + str(VERSION) + "\n")
-    f.write(str(limit) + " " + str(size[0]*size[1]*3) + "\n")
-    #f.write(struct.pack("<ii", len(data), size[0]*size[1]*3))
-    
+        f=open(sys.argv[1] + "." + str(fidx), "wb")
+        fInfo=open(sys.argv[1] + "." + str(fidx) + ".info", "w")
+        fidx += 1
+
+        f.write("Matrix " + str(VERSION) + "\n")
+        f.write(str(limit) + " " + str(size[0]*size[1]*3) + "\n")
+        #f.write(struct.pack("<ii", len(data), size[0]*size[1]*3))
+    if VERSION == 3:
+        datafilename = sys.argv[1] + "." + str(fidx) + ".bin"
+
+        f=open(datafilename, "wb")
+
+        fInfo=open(sys.argv[1] + "." + str(fidx) + ".info", "w")
+
+        fHeader = open(sys.argv[1] + "." + str(fidx) + ".dat", "w")
+        fHeader.write("Matrix " + str(VERSION) + "\n")
+        fHeader.write(str(limit) + " " + str(size[0]*size[1]*3) + "\n")
+        fHeader.write("DataFile " + datafilename + "\n")
+        fHeader.close()
+
+        fidx += 1
+ 
     
     idx = 0
     used = 0

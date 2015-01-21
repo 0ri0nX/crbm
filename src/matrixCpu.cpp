@@ -21,6 +21,7 @@
 #include <random>
 
 #include "matrixCpu.h"
+#include "utils.h"
 
 #include <cblas.h>
 namespace YAMATH
@@ -160,6 +161,12 @@ namespace YAMATH
                 std::stringstream hs(header);
                 hs >> outX >> outY;
             }
+            else if (outVersion == 3)//only header -> binary saved floats are in other file
+            {
+                std::getline(inStream, header, '\n');
+                std::stringstream hs(header);
+                hs >> outX >> outY;
+            }
         }
         else//oldest-version
         {
@@ -168,7 +175,7 @@ namespace YAMATH
             hs >> outX >> outY;
         }
         
-        std::cout << "version= " << outVersion << ", size= " << outX << " x " << outY << std::endl;
+        std::cout << "version = " << outVersion << ", size = " << outX << " x " << outY << std::endl;
 
         return inStream;
     }
@@ -303,6 +310,15 @@ namespace YAMATH
                     }
                     printProgress(i, x);
                 }
+            }
+        }
+        else if (inVersion == 3)//binary saved floats in separate file that will be mapped into memory
+        {
+            if(m_CacheFileName == "")
+            {
+                std::string dataFile;
+                lv(inStream, "DataFile", dataFile);
+                Reset(y, x, NULL, dataFile);
             }
         }
         else

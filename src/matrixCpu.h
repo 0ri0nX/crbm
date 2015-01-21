@@ -177,9 +177,6 @@ namespace YAMATH
 
                     fstat(m_FileCache, &st);
 
-                    std::cout << "Real size: " << st.st_size << std::endl;
-                    std::cout << "Desired  : " << size << std::endl;
-
                     assert(st.st_size == size);
 
                     //ssize_t result = lseek(m_FileCache, size, SEEK_SET);

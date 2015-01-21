@@ -17,3 +17,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, python, python-imaging, python-nump
 Description: crbm computer example
  <insert long description, indented with spaces>
 
+Package: crbm-computer-cpu-dev
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, crbm-computer-cpu
+Description: crbm computer development files
+ <insert long description, indented with spaces>
+

@@ -1,3 +1,4 @@
+#include "crbmComputerBinding.h"
 #include "crbmComputer.h"
 
 extern "C"

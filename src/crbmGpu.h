@@ -612,7 +612,7 @@ namespace CRBM
                 float nCenter = normalNoise.get(0, i-1) * dev * s().noiseCenterRange;
                 float nDev = normalNoise.get(1, i-1) * dev * s().noiseDevRange;
 
-                noise.RandNormal(nCenter, nDev);
+                noise.RandNormal(nCenter, fabs(nDev));
                 noise = noise + x;
 
                 //std::cout << "Noise enter: " << nCenter << ", noise dev: " << nDev << std::endl;

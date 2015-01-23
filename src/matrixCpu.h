@@ -80,7 +80,7 @@ namespace YAMATH
 
             virtual void        Reset(std::istream *inStream);
 
-            void                LoadComplete(MatrixCpu &outMatrix);
+            void                LoadComplete(MatrixCpu &outMatrix, bool inTransposed = false);
 
             int                 getStep(void) const;
 
@@ -94,7 +94,7 @@ namespace YAMATH
             std::istream        *m_MainStream;
             std::ifstream       m_SecondStream;
             int                 m_Version;
-            std::string         m_SecondFile;
+            std::string         m_SecondFileName;
             int                 m_Step;
             t_index             m_X;
             t_index             m_Y;
@@ -121,8 +121,8 @@ namespace YAMATH
     class MatrixCpu//column-first layout
     {
         public:
-            MatrixCpu(t_index inX = 1, t_index inY = 1, const float * inInit = NULL, std::string inCacheFileName = "") //column first order
-                : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileName(inCacheFileName), m_FileCache(-1), m_FileCacheOffset(0)
+            MatrixCpu(t_index inX = 1, t_index inY = 1, const float * inInit = NULL) //column first order
+                : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileHandle(-1)
             {
                 Reset(inX, inY, inInit);
             }
@@ -133,13 +133,13 @@ namespace YAMATH
 //column-first order - ld is leading dimension size - #rows
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
 
-            std::ostream &Save(std::ostream &outStream, bool addHeaderInfo = true, int version = 2) const;
-            std::istream &Load(std::istream &inStream, bool inTransposed = false, const std::string &inCacheFileName = "");
+            std::ostream &Save(std::ostream &outStream) const;
+            std::istream &Load(std::istream &inStream, bool inTransposed = false);
             
-            static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version);
+            /*static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version);
             static std::istream &LoadHeader(std::istream &inStream, int &outVersion, t_index &outX, t_index &outY);
             std::istream &LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName);
-
+*/
 
             ~MatrixCpu(void)
             {
@@ -211,8 +211,12 @@ namespace YAMATH
             //sampls columns - effective
             void SampleCols(t_index inColsNum, MatrixCpu &outSample) const;
 
-            bool isCached(t_index inDataSize)
+            bool isCached(void)
             {
+                return m_CacheFileHandle != -1;
+
+                /*
+
                 if(m_CacheFileName != "")
                 {
                     t_index fsize = inDataSize*sizeof(float);
@@ -246,9 +250,9 @@ namespace YAMATH
                     //}
                 }
 
-                return false;
+                return false;*/
             }
-            void setCached(t_index inDataSize, bool yes)
+            /*void setCached(t_index inDataSize, bool yes)
             {
                 if(m_CacheFileName != "")
                 {
@@ -293,13 +297,35 @@ namespace YAMATH
             int getCachedTestSize(void)
             {
                 return 4;
-            }
+            }*/
 
-            void AllocateMemory(t_index inDataSize, const std::string &inCacheFileName)
+            void AllocateMemory(t_index inDataSize, int inCacheFileHandle)
             {
-                m_CacheFileName = inCacheFileName;
+                assert(m_CacheFileHandle == -1);
 
-                if(m_CacheFileName != "")
+                //memory mapping
+                if(inCacheFileHandle != -1)
+                {
+                    m_CacheFileHandle = inCacheFileHandle;
+
+                    t_index size = inDataSize*sizeof(float);
+
+                    m_Data = (float*)mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, m_CacheFileHandle, 0);
+
+                    madvise(m_Data, size, MADV_RANDOM);
+
+                    if (m_Data == MAP_FAILED)
+                    {
+                        close(m_CacheFileHandle);
+                        throw std::runtime_error("Error mmapping the file");
+                    }
+                }
+                else
+                {
+                    m_Data = new float [inDataSize];
+                }
+
+                /*if(m_CacheFileName != "")
                 {
                     t_index size = inDataSize*sizeof(float);
                     //std::cout << "step 1" << std::endl;
@@ -343,36 +369,38 @@ namespace YAMATH
                 else
                 {
                     m_Data = new float [inDataSize];
-                }
+                }*/
             }
 
             void DeallocateMemory(void)
             {
-                if(m_CacheFileName != "")
+                if(m_CacheFileHandle != -1)
                 {
                     int result = munmap(m_Data, m_X*m_Y*sizeof(float));
                     if (result == -1)
                     {
-                        perror("Error un-mmapping the file");
+                        perror("Error while unmapping the data file!");
                     }
-                    close(m_FileCache);
+                    close(m_CacheFileHandle);
                 }
                 else
                 {
                     delete [] m_Data;
                 }
+
+                m_Data = NULL;
             }
 
-            void Reset(t_index inX, t_index inY, const float * inInit = NULL, const std::string &inCacheFileName = "")
+            void Reset(t_index inX, t_index inY, const float * inInit = NULL, int inCacheFileHandle = -1)
             {
-                if(m_X*m_Y != inX*inY || m_CacheFileName != inCacheFileName)
+                if(m_X*m_Y != inX*inY || m_CacheFileHandle != inCacheFileHandle)
                 {
                     if(m_Data != NULL)
                     {
                         DeallocateMemory();
                     }
 
-                    AllocateMemory(inX*inY, inCacheFileName);
+                    AllocateMemory(inX*inY, inCacheFileHandle);
 
                     assert(m_Data != NULL);
                 }
@@ -418,9 +446,7 @@ namespace YAMATH
             t_index m_X;
             t_index m_Y;
             float *m_Data;
-            std::string m_CacheFileName;
-            int m_FileCache;
-            int m_FileCacheOffset;
+            int m_CacheFileHandle;
     };
 
 }

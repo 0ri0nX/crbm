@@ -91,8 +91,10 @@ int main(int argc, char** argv)
     }
 
     MatrixCpu x;
-    //matrix is transposed!!! => pictures are saved one after another - like in the file
-    loadMatrix(x, argv[3], true, string(argv[3]) + ".cache");
+    //matrix is transposed!!! => pictures are saved one after another - like in the file => row major ~ col major transposed
+    //loadMatrix(x, argv[3], true, string(argv[3]) + ".cache");
+    MatrixLoaderFile loader(argv[3]);
+    loader.LoadComplete(x, true);
 
     timer.tic();
     abc->LearnAll(x, string(argv[3]) + ".rbm", true);

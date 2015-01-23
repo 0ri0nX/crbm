@@ -40,7 +40,7 @@ void sv<>(std::ostream &out, const std::string &inName, const YAMATH::MatrixGpu 
 {
     out << inName << " ";
     YAMATH::MatrixCpu m = inValue;
-    m.Save(out, true, 2);
+    m.Save(out);
     out << std::endl;
 }
 

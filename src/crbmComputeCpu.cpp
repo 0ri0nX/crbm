@@ -77,12 +77,15 @@ int main(int argc, char** argv)
     Timer timer2;
     t_index cols = 0;
     t_index rows = 0;
-    int loadVersion = -1;
 
     //data-file
     std::ifstream fdata(argv[3]);
 
-    xCpu.LoadHeader(fdata, loadVersion, rows, cols);
+    MatrixLoaderFile loader(argv[3]);
+    loader.PartLoadInit();
+    loader.PartLoadHeader(rows, cols);
+
+    //xCpu.LoadHeader(fdata, loadVersion, rows, cols);
 
     int batchNum = (rows - 1) / batchSize + 1;
 
@@ -140,7 +143,18 @@ int main(int argc, char** argv)
 
         t_index actBatchSize = (batch != batchNum) ? batchSize : (rows - (batchNum-1)*batchSize);
 
-        xx.LoadBatch(fdata, false, loadVersion, actBatchSize, cols, "");
+        //xx.LoadBatch(fdata, false, loadVersion, actBatchSize, cols, "");
+        bool proceed = loader.PartLoadBatch(xx, actBatchSize);
+
+        if(proceed)
+        {
+            assert(batch < batchNum);
+        }
+        else
+        {
+            assert(batch == batchNum);
+        }
+
         xxOrig = xx;
 
         //xx = xCpu->SubMatrix(a, 0, b, cols);
@@ -200,6 +214,8 @@ int main(int argc, char** argv)
             continue;
         }
     }
+
+    loader.PartLoadFinish();
 
     saver.PartSaveFinish();
     if(saver.getVersion() != -1)

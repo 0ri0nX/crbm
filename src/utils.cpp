@@ -1,16 +1,17 @@
 #include "utils.h"
+#include "matrixCpu.h"
 
+using namespace YAMATH;
 
-void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed, const std::string &inCacheFileName)
+void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed)
 {
 #if LOAD_VERBOSITY > 1
     std::cout << "loading [" << filename << "] ... " << std::flush;
     Timer t;
 #endif
 
-    std::ifstream f(filename.c_str());
-    inM.Load(f, inTransposed, inCacheFileName);
-    f.close();
+    MatrixLoaderFile loader(filename);
+    loader.LoadComplete(inM, inTransposed);
 
 #if LOAD_VERBOSITY > 1
     std::cout << inM.getX() << " x " << inM.getY() << "  ";
@@ -18,13 +19,12 @@ void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTran
 #endif
 }
 
-void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename)
+void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename, int inVersion)
 {
     std::cout << "saving [" << filename << "] ... " << std::flush;
     Timer t;
-    std::ofstream f(filename.c_str());
-    inM.Save(f);
-    f.close();
+    MatrixSaverFile saver(filename, inVersion);
+    saver.SaveComplete(inM);
     t.tac();
 }
 
@@ -53,7 +53,7 @@ template<>
 void sv<>(std::ostream &out, const std::string &inName, const YAMATH::MatrixCpu &inValue)
 {
     out << inName << " ";
-    inValue.Save(out, true, 2);
+    inValue.Save(out);
     out << std::endl;
 }
 

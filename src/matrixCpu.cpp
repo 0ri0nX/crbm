@@ -34,7 +34,7 @@ namespace YAMATH
         }*/
 
     MatrixCpu::MatrixCpu(const MatrixCpu &inMatrix)
-        : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileName(""), m_FileCache(-1)
+        : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileHandle(-1)
         {
             Reset(inMatrix.getX(), inMatrix.getY(), inMatrix.getDataConst());
         }
@@ -92,7 +92,7 @@ namespace YAMATH
         for(t_index i = 0; i < inColsNum; ++i)
         {
             randomCol[i] = dist(randomDevice);
-            if(m_CacheFileName != "")
+            if(m_CacheFileHandle != -1)
             {
                 madvise(getDataConst() + randomCol[i]*getX(), getX()*sizeof(float), MADV_WILLNEED);
             }
@@ -111,7 +111,7 @@ namespace YAMATH
                 }
             }
   
-            if(m_CacheFileName != "")
+            if(m_CacheFileHandle != -1)
             {
                 madvise(getDataConst() + randomCol[i]*getX(), getX()*sizeof(float), MADV_NORMAL);
             }
@@ -136,7 +136,7 @@ namespace YAMATH
         }
     }
 
-    std::istream &MatrixCpu::LoadHeader(std::istream &inStream, int &outVersion, t_index &outX, t_index &outY)
+    /*std::istream &MatrixCpu::LoadHeader(std::istream &inStream, int &outVersion, t_index &outX, t_index &outY)
     {
         std::string header;
         std::getline(inStream, header, '\n');
@@ -178,9 +178,9 @@ namespace YAMATH
         std::cout << "version = " << outVersion << ", size = " << outX << " x " << outY << std::endl;
 
         return inStream;
-    }
+    }*/
 
-    std::istream &MatrixCpu::LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName)
+    /*std::istream &MatrixCpu::LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName)
     {
         if(inVersion == 0)
         {
@@ -329,18 +329,16 @@ namespace YAMATH
         setCached(x*y, true);
     
         return inStream;
-    }
+    }*/
 
-    std::istream &MatrixCpu::Load(std::istream &inStream, bool inTransposed, const std::string &inCacheFileName)
+    std::istream &MatrixCpu::Load(std::istream &inStream, bool inTransposed)
     {
-        t_index x, y;
-        int version;
+        MatrixLoaderStream loader(&inStream);
 
-        LoadHeader(inStream, version, x, y);
-        LoadBatch (inStream, inTransposed, version, x, y, inCacheFileName);
+        loader.LoadComplete(*this, inTransposed);
     }
     
-    std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version)
+    /*std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version)
     {
         if(version == 0)
         {
@@ -367,10 +365,15 @@ namespace YAMATH
         }
 
         return outStream;
-    }
+    }*/
 
-    std::ostream &MatrixCpu::Save(std::ostream &outStream, bool addHeaderInfo, int version) const
+    std::ostream &MatrixCpu::Save(std::ostream &outStream) const
     {
+        MatrixSaverStream saver(&outStream, 2);
+
+        saver.SaveComplete(*this);
+    }
+/*
         if(addHeaderInfo)
         {
             SaveHeader(outStream, getX(), getY(), version);
@@ -442,7 +445,7 @@ namespace YAMATH
         }
     
         return outStream;
-    }
+    }*/
 
     void MatrixCpu::RandNormal(float inMean, float inStdDev, unsigned long long inSeed)//normal randomess, mean 0.0f standard deviation 1.0f
     {
@@ -762,14 +765,14 @@ namespace YAMATH
         m_MainStream = inStream;
     }
 
-    void MatrixLoaderStream::LoadComplete(MatrixCpu &outMatrix)
+    void MatrixLoaderStream::LoadComplete(MatrixCpu &outMatrix, bool inTransposed)
     {
         assert(getStep() == 0);
 
         PartLoadInit();
         t_index x, y;
         PartLoadHeader(x, y);
-        PartLoadBatch(outMatrix, x);
+        PartLoadBatch(outMatrix, x, inTransposed);
         PartLoadFinish();
 
         assert(getStep() == 0);
@@ -786,8 +789,6 @@ namespace YAMATH
 
         assert(m_MainStream != NULL);
 
-        //TODO
-
         m_Step = 1;
     }
 
@@ -795,7 +796,7 @@ namespace YAMATH
     {
         assert(getStep() == 1);
 
-        m_SecondFile = "";
+        m_SecondFileName = "";
 
         std::string header;
         std::getline(*m_MainStream, header, '\n');
@@ -825,7 +826,7 @@ namespace YAMATH
                 std::getline(*m_MainStream, header, '\n');
                 hs.str(header);
                 hs >> outX >> outY;
-                lv(*m_MainStream, "DataFile", m_SecondFile);
+                lv(*m_MainStream, "DataFile", m_SecondFileName);
             }
             else
             {
@@ -933,14 +934,31 @@ namespace YAMATH
         //binary saved floats
         else if (m_Version == 2 || m_Version == 3)
         {
-            //the only possibility to map file into memory
-            if(m_Version == 3 && m_SecondFile != "-" && batchSize == m_X)
+            //the only possibility to map file into memory is when loading the whole data and want the transposed version
+            if(m_Version == 3 && m_SecondFileName != "-" && batchSize == m_X && inTransposed)
             {
-                //TODO: mmap
+                int fileHandle = open(m_SecondFileName.c_str(), O_RDWR);
+
+                if (fileHandle == -1)
+                {
+                    throw std::runtime_error(std::string("Error opening file [" + m_SecondFileName + "] for writing"));
+                }
+
+                outMatrix.Reset(m_Y, m_X, NULL, fileHandle);
             }
             else
             {
-                std::istream &actStream = (m_Version == 3 && m_SecondFile != "-") ? m_SecondStream : (*m_MainStream);
+                if(m_Version == 3 && m_SecondFileName != "-" && m_ReadX == 0)
+                {
+                    m_SecondStream.open(m_SecondFileName);
+
+                    if(!m_SecondStream.is_open())
+                    {
+                        throw std::runtime_error(std::string("Error opening file [" + m_SecondFileName + "] for writing"));
+                    }
+                }
+
+                std::istream &actStream = (m_SecondStream.is_open()) ? m_SecondStream : (*m_MainStream);
                 float d[m_Y];
     
                 t_index sizeOfSavedFloat = 4;
@@ -997,7 +1015,7 @@ namespace YAMATH
     {
         assert(getStep() == 3 || getStep() == 3);
 
-        if(m_Version == 3 && m_SecondFile != "-")
+        if(m_SecondStream.is_open())
         {
             m_SecondStream.close();
         }

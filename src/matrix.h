@@ -1059,7 +1059,7 @@ int MatrixGpu::m_Allocations = 0;
     };
 
     MatrixCpu::MatrixCpu(const MatrixGpu &inMatrix)
-        : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileName(""), m_FileCache(-1)
+        : m_X(0), m_Y(0), m_Data(NULL), m_CacheFileHandle(-1)
         {
             Reset(inMatrix.getX(), inMatrix.getY());
             cudaMemcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToHost);

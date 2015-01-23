@@ -40,9 +40,9 @@ class Timer
 };
 
 
-void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false, const std::string &inCacheFileName = "");
+void loadMatrix(YAMATH::MatrixCpu &inM, const std::string& filename, bool inTransposed = false);
 
-void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename);
+void saveMatrix(const YAMATH::MatrixCpu &inM, const std::string &filename, int inVersion = 3);
 
 //save to stream
 template<typename T>

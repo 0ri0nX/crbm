@@ -16,7 +16,29 @@ using namespace std;
 #include "crbmCpu.h"
 
 using namespace YAMATH;
+    float computeError(const YAMATH::MatrixCpu &inInp, const YAMATH::MatrixCpu &inOut)
+    {
+        double resD = 0.0f;
+        for(t_index i = 0; i < inInp.getX()*inInp.getY(); ++i)
+        {
+            double tmp = inInp.getDataConst()[i] - inOut.getDataConst()[i];
+            resD += tmp*tmp;
+        }
 
+        resD = sqrt(resD);
+
+        float res = resD/double(inInp.getX()*inInp.getY());
+
+        //if(res != res)
+        if(isnan(res) || isinf(res))
+        {
+            std::cout << "Returned " << res << " when computing error!" << std::endl;
+
+            exit(1);
+        }
+
+        return res;
+    }
 string getName(const string &inPrefix, int inIdx, int inTotal)
 {
     stringstream s;
@@ -31,7 +53,7 @@ int main(int argc, char** argv)
     if(argc < 5)
     {
         cout << "Too few params!" << endl;
-        cout << argv[0] << " <cpu-id> <reconstruct|transform> input-vector-file crbm-file1 [crbm-file2] ..." << endl;
+        cout << argv[0] << " <cpu-id> <reconstruct|transform|reconstructionError> input-vector-file crbm-file1 [crbm-file2] ..." << endl;
         exit(1);
     }
 
@@ -39,7 +61,7 @@ int main(int argc, char** argv)
     int cpuid = atoi(argv[1]);
 
     string computationType = argv[2];
-    if(computationType != "reconstruct" && computationType != "transform")
+    if(computationType != "reconstruct" && computationType != "transform" && computationType != "reconstructionError")
     {
         cout << "Unsupported computation type: [" << computationType << "]" << endl;
         exit(1);
@@ -77,9 +99,12 @@ int main(int argc, char** argv)
     int resSize = -1;
     string outFilename = string(argv[3]);
 
+    MatrixSaverFile saver("", -1);
+
     if(computationType == "transform")
     {
         outFilename += ".transformed";
+        saver.Reset(outFilename, 3);
 
         int outX, outY;
         layers.back()->getConvolutionPatchesNumber(outX, outY);
@@ -88,27 +113,19 @@ int main(int argc, char** argv)
     else
     {
         outFilename += ".reconstruct";
+        saver.Reset(outFilename, 0);
         resSize = cols;
     }
 
-    cout << "Saving into: [" << outFilename << "]" << endl;
-
-    ofstream f(outFilename.c_str());
-
-    int saveVersion = -1;
-    if(computationType == "reconstruct")
+    if(saver.getVersion() != -1)
     {
-        saveVersion = 0;
-    }
-    if(computationType == "transform")
-    {
-        saveVersion = 2;
+        cout << "Saving into: [" << outFilename << "]" << endl;
     }
 
-    MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
-    //f << rows << " " << resSize << endl;
+    saver.PartSaveInit();
+    saver.PartSaveHeader(rows, resSize);
 
-    MatrixCpu xx, xxTrans;
+    MatrixCpu xx, xxOrig;
     MatrixCpu tmpxx;
     timer.tic();
 
@@ -124,6 +141,7 @@ int main(int argc, char** argv)
         t_index actBatchSize = (batch != batchNum) ? batchSize : (rows - (batchNum-1)*batchSize);
 
         xx.LoadBatch(fdata, false, loadVersion, actBatchSize, cols, "");
+        xxOrig = xx;
 
         //xx = xCpu->SubMatrix(a, 0, b, cols);
 
@@ -153,7 +171,7 @@ int main(int argc, char** argv)
         {
             timer.tic();
             tmpxx = xx;
-            tmpxx.Save(f, false, saveVersion);
+            saver.PartSaveBatch(tmpxx);
             timer.tac("   saved: ");
             continue;
         }
@@ -167,18 +185,27 @@ int main(int argc, char** argv)
             xx = y;
         }
 
+        if(computationType == "reconstructionError" || computationType == "reconstruct")
+        {
+            float error = computeError(xx, xxOrig);
+            cout << "   Error = " << error << endl;
+        }
+
         if(computationType == "reconstruct")
         {
             timer.tic();
             tmpxx = xx;
-            tmpxx.Save(f, false, saveVersion);
+            saver.PartSaveBatch(tmpxx);
             timer.tac("   saved: ");
             continue;
         }
     }
 
-    f.close();
-    cout << "Saved into: [" << outFilename << "]" << endl;
+    saver.PartSaveFinish();
+    if(saver.getVersion() != -1)
+    {
+        cout << "Saved into: [" << outFilename << "]" << endl;
+    }
 
     return 0;
 }

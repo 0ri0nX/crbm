@@ -92,9 +92,12 @@ int main(int argc, char** argv)
     int resSize = -1;
     string outFilename = string(argv[3]);
 
+    MatrixSaverFile saver("", -1);
+
     if(computationType == "transform")
     {
         outFilename += ".transformed";
+        saver.Reset(outFilename, 3);
 
         int outX, outY;
         layers.back()->getConvolutionPatchesNumber(outX, outY);
@@ -103,32 +106,17 @@ int main(int argc, char** argv)
     else
     {
         outFilename += ".reconstruct";
+        saver.Reset(outFilename, 0);
         resSize = cols;
     }
 
-    ofstream f;
-    if(computationType != "reconstructionError")
+    if(saver.getVersion() != -1)
     {
         cout << "Saving into: [" << outFilename << "]" << endl;
-
-        f.open(outFilename.c_str());
     }
 
-    int saveVersion = -1;
-    if(computationType == "reconstruct")
-    {
-        saveVersion = 0;
-    }
-    if(computationType == "transform")
-    {
-        saveVersion = 2;
-    }
-
-    if(computationType != "reconstructionError")
-    {
-        MatrixCpu::SaveHeader(f, rows, resSize, saveVersion);
-        //f << rows << " " << resSize << endl;
-    }
+    saver.PartSaveInit();
+    saver.PartSaveHeader(rows, resSize);
 
     MatrixCpu xxCpu;
     Mat xx, xxTrans;
@@ -168,8 +156,8 @@ int main(int argc, char** argv)
             timer.tic();
             cout << "   Transforming with layer " << i+1 << flush;
             layers[i]->Transform(xx, y);
-            timer.tac(" ");
             xx = y;
+            timer.tac(" ");
         }
         timer2.tac("  All layers: ");
 
@@ -177,7 +165,7 @@ int main(int argc, char** argv)
         {
             timer.tic();
             tmpxx = xx;
-            tmpxx.Save(f, false, saveVersion);
+            saver.PartSaveBatch(tmpxx);
             timer.tac("   saved: ");
             continue;
         }
@@ -201,15 +189,15 @@ int main(int argc, char** argv)
         {
             timer.tic();
             tmpxx = xx;
-            tmpxx.Save(f, false, saveVersion);
+            saver.PartSaveBatch(tmpxx);
             timer.tac("   saved: ");
             continue;
         }
     }
 
-    if(computationType != "reconstructionError")
+    saver.PartSaveFinish();
+    if(saver.getVersion() != -1)
     {
-        f.close();
         cout << "Saved into: [" << outFilename << "]" << endl;
     }
 

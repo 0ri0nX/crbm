@@ -5,7 +5,7 @@
 #include <float.h>
 #include <cstdlib>
 #include <ctime>
-#include <iostream>
+#include <fstream>
 #include <sstream>
 #include <stdint.h>
 #include <cstring>
@@ -26,6 +26,98 @@ namespace YAMATH
     
     class MatrixGpu;//forward
 
+    class MatrixCpu;//forward
+
+    class MatrixSaverStream
+    {
+        public:
+            MatrixSaverStream(std::ostream *inStream = NULL, int inVersion = 2, const std::string &inFileNamePrefix = "-");//"-" implies that all will be saved into one stream even if it is possible to split it
+            ~MatrixSaverStream(void);
+
+            virtual void        Reset(std::ostream *inStream, int inVersion = 2, const std::string &inFileNamePrefix = "-");
+
+            void                SaveComplete(const MatrixCpu &inMatrix);
+
+            int                 getVersion(void) const;
+            const std::string   &getPrefix(void) const;
+            int                 getStep(void) const;
+
+            virtual void        PartSaveInit(void);
+            virtual void        PartSaveHeader(t_index inExpectedRows, t_index inExpectedCols);
+            virtual void        PartSaveBatch(const MatrixCpu &inMatrix);
+            virtual void        PartSaveFinish(void);
+
+        protected:
+
+            std::ostream        *m_MainStream;
+            std::ofstream       m_SecondStream;
+            int                 m_Version;
+            std::string         m_Prefix;
+            int                 m_Step;
+    };
+
+    class MatrixSaverFile : public MatrixSaverStream
+    {
+        public:
+            MatrixSaverFile(const std::string &inFileNamePrefix = "", int inVersion = 2);//version==-1 implies no saving
+
+            void                Reset(const std::string &inFileNamePrefix, int inVersion = 2);
+
+            virtual void        PartSaveInit(void);
+            virtual void        PartSaveFinish(void);
+
+        protected:
+            virtual void        Reset(std::ostream *inStream, int inVersion, const std::string &inFileNamePrefix);
+
+            std::ofstream       m_MainFileStream;
+    };
+
+    class MatrixLoaderStream
+    {
+        public:
+            MatrixLoaderStream(std::istream *inStream = NULL);
+            ~MatrixLoaderStream(void);
+
+            virtual void        Reset(std::istream *inStream);
+
+            void                LoadComplete(MatrixCpu &outMatrix);
+
+            int                 getStep(void) const;
+
+            virtual void        PartLoadInit(void);
+            virtual void        PartLoadHeader(t_index &outRows, t_index &outCols);
+            virtual bool        PartLoadBatch(MatrixCpu &outMatrix, t_index inMaxBatchSize, bool inTransposed = false);//returns true while there is stil something to read
+            virtual void        PartLoadFinish(void);
+
+        protected:
+
+            std::istream        *m_MainStream;
+            std::ifstream       m_SecondStream;
+            int                 m_Version;
+            std::string         m_SecondFile;
+            int                 m_Step;
+            t_index             m_X;
+            t_index             m_Y;
+            t_index             m_ReadX;
+    };
+
+    class MatrixLoaderFile : public MatrixLoaderStream
+    {
+        public:
+            MatrixLoaderFile(const std::string &inFileName = "");
+
+            void                Reset(const std::string &inFileName);
+
+            virtual void        PartLoadInit(void);
+            virtual void        PartLoadFinish(void);
+
+        protected:
+            virtual void        Reset(std::istream *inStream);
+
+            std::ifstream       m_MainFileStream;
+            std::string         m_FileName;
+    };
+
     class MatrixCpu//column-first layout
     {
         public:
@@ -41,13 +133,13 @@ namespace YAMATH
 //column-first order - ld is leading dimension size - #rows
 #define IDX2C(i,j,ld) (((j)*(ld))+(i))
 
+            std::ostream &Save(std::ostream &outStream, bool addHeaderInfo = true, int version = 2) const;
+            std::istream &Load(std::istream &inStream, bool inTransposed = false, const std::string &inCacheFileName = "");
+            
+            static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version);
             static std::istream &LoadHeader(std::istream &inStream, int &outVersion, t_index &outX, t_index &outY);
             std::istream &LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName);
 
-            std::istream &Load(std::istream &inStream, bool inTransposed = false, const std::string &inCacheFileName = "");
-
-            static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version = 2);
-            std::ostream &Save(std::ostream &outStream, bool addHeaderInfo = true, int version = 2) const;
 
             ~MatrixCpu(void)
             {
@@ -301,8 +393,13 @@ namespace YAMATH
             MatrixCpu &operator*=(const MatrixCpu &inB);//elementwise multiplication!
 
             friend MatrixCpu Mult(const MatrixCpu &inA, const MatrixCpu &inB, bool transposedA = false, bool transposedB = false);//matrix multiplication!
+            friend class MatrixSaverStream;
+            friend class MatrixLoaderStream;
 
         protected:
+
+            //static std::ostream &SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version = 2);
+            //static void SaveHeader(const std::string &inFile, std::ofstream &outOfstream, t_index expectedRows, t_index expectedCols, int version = 3);//creates header and returns stream to write in
 
             /*void Init(t_index inX, t_index inY, const float *inInit = NULL)
             {

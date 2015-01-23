@@ -368,6 +368,7 @@ namespace YAMATH
 
         return outStream;
     }
+
     std::ostream &MatrixCpu::Save(std::ostream &outStream, bool addHeaderInfo, int version) const
     {
         if(addHeaderInfo)
@@ -399,7 +400,7 @@ namespace YAMATH
 
             throw std::runtime_error(e.str());
         }
-        else if(version == 2)
+        else if(version == 2 || version == 3)
         {
             //t_index sizeOfSavedt_index = 4, x = m_X, y = m_Y;
             //assert(sizeof(int) == sizeOfSavedInt);
@@ -489,6 +490,565 @@ namespace YAMATH
 
         return outMatrix;
     }
+
+    //"-" implies that all will be saved into one stream even if it is possible to split it
+    MatrixSaverStream::MatrixSaverStream(std::ostream *inStream, int inVersion, const std::string &inFileNamePrefix)
+        : m_MainStream(NULL)
+          , m_SecondStream()
+    {
+        m_Step == 0;
+
+        Reset(inStream, inVersion, inFileNamePrefix);
+    }
+
+    MatrixSaverStream::~MatrixSaverStream(void)
+    {
+        assert(m_Step == 0);
+    }
+
+
+    void MatrixSaverStream::Reset(std::ostream *inStream, int inVersion, const std::string &inFileNamePrefix)
+    {
+        assert(m_Step == 0);
+
+        m_MainStream = inStream;
+        m_Prefix = inFileNamePrefix;
+        m_Version = inVersion;
+    }
+
+    void MatrixSaverStream::SaveComplete(const MatrixCpu &inMatrix)
+    {
+        PartSaveInit();
+        PartSaveHeader(inMatrix.getX(), inMatrix.getY());
+        PartSaveBatch(inMatrix);
+        PartSaveFinish();
+    }
+
+    int MatrixSaverStream::getVersion(void) const
+    {
+        return m_Version;
+    }
+
+    const std::string &MatrixSaverStream::getPrefix(void) const
+    {
+        return m_Prefix;
+    }
+
+    int MatrixSaverStream::getStep() const
+    {
+        return m_Step;
+    }
+
+    void MatrixSaverStream::PartSaveInit()
+    {
+        if(getVersion() == -1)
+        {
+            return;
+        }
+
+        assert(m_Step == 0);
+
+        if(getVersion() == 3)
+        {
+            if(m_Prefix != "-")
+            {
+                std::string bin = m_Prefix + ".bin";
+                m_SecondStream.open(bin.c_str());
+            }
+        }
+
+        m_Step = 1;
+    }
+    void MatrixSaverStream::PartSaveHeader(t_index inExpectedRows, t_index inExpectedCols)
+    {
+        if(getVersion() == -1)
+        {
+            return;
+        }
+
+        assert(m_Step == 1);
+
+        if(getVersion() == 0)
+        {
+            (*m_MainStream) << inExpectedRows << " " << inExpectedCols << std::endl;
+        }
+        //else if(version == 1)
+        //{
+        //    std::stringstream e;
+        //    e << "Matrix 1 version cannot be saved!" << std::endl;
+
+        //    throw std::runtime_error(e.str());
+        //}
+        else if(getVersion() == 2)
+        {
+            (*m_MainStream) << "Matrix 2" << std::endl;
+            (*m_MainStream) << inExpectedRows << " " << inExpectedCols << std::endl;
+        }
+        else if(getVersion() == 3)
+        {
+            (*m_MainStream) << "Matrix 3" << std::endl;
+            (*m_MainStream) << inExpectedRows << " " << inExpectedCols << std::endl;
+            if(m_Prefix == "-")
+            {
+                (*m_MainStream) << "DataFile -" << std::endl;
+            }
+            else
+            {
+                (*m_MainStream) << "DataFile" << " " << m_Prefix << ".bin" << std::endl;
+            }
+        }
+        else
+        {
+            std::stringstream e;
+            e << "Unknown version for matrix save, wanted [0,2,3] but got [" << getVersion() << "]" << std::endl;
+
+            throw std::runtime_error(e.str());
+        }
+
+        m_Step = 2;
+    }
+
+    void MatrixSaverStream::PartSaveBatch(const MatrixCpu &inMatrix)
+    {
+        if(getVersion() == -1)
+        {
+            return;
+        }
+
+        assert(m_Step == 2 || m_Step == 3);
+
+        if(getVersion() == 0)
+        {
+            for(t_index i = 0; i < inMatrix.m_X; ++i)
+            {
+                if(inMatrix.m_Y > 0)
+                {
+                    (*m_MainStream) << inMatrix.m_Data[IDX2C(i, 0, inMatrix.m_X)];
+                }
+    
+                for(t_index j = 1; j < inMatrix.m_Y; ++j)
+                {
+                    (*m_MainStream) << " " << inMatrix.m_Data[IDX2C(i, j, inMatrix.m_X)];
+                }
+    
+                (*m_MainStream) << std::endl;
+            }
+        }
+        //else if(version == 1)
+        //{
+        //    std::stringstream e;
+        //    e << "Matrix 1 version cannot be saved!" << std::endl;
+
+        //    throw std::runtime_error(e.str());
+        //}
+        else if(getVersion() == 2 || getVersion() == 3)
+        {
+            std::ostream &outStream = (getVersion() == 3 && m_Prefix != "-") ? m_SecondStream : (*m_MainStream);
+
+            t_index sizeOfSavedFloat = 4;
+            assert(sizeof(float) == sizeOfSavedFloat);
+            float d[inMatrix.m_Y];
+
+            for(t_index i = 0; i < inMatrix.m_X; ++i)
+            {
+                for(t_index j = 0; j < inMatrix.m_Y; ++j)
+                {
+                    d[j] = inMatrix.m_Data[IDX2C(i, j, inMatrix.m_X)];
+                }
+
+                outStream.write((char*)d, inMatrix.m_Y*sizeOfSavedFloat);
+            }
+        }
+        else
+        {
+            std::stringstream e;
+            e << "Unknown version for matrix save, wanted [0-2] but got [" << getVersion() << "]" << std::endl;
+
+            throw std::runtime_error(e.str());
+        }
+
+        m_Step == 3;
+    }
+
+    void MatrixSaverStream::PartSaveFinish(void)
+    {
+        if(getVersion() == -1)
+        {
+            return;
+        }
+
+        assert(m_Step == 3);
+
+        if(getVersion() == 3)
+        {
+            if(m_Prefix != "-")
+            {
+                m_SecondStream.close();
+            }
+        }
+
+        m_Step = 0;
+    }
+
+    void MatrixSaverFile::PartSaveInit(void)
+    {
+        if(getVersion() == -1)
+        {
+            return;
+        }
+
+        assert(getStep() == 0);
+
+        std::string name = getPrefix() + ".dat";
+
+        m_MainFileStream.open(name.c_str());
+
+        Reset(&m_MainFileStream, getVersion(), getPrefix());
+
+        MatrixSaverStream::PartSaveInit();
+
+        assert(m_Step == 1);
+    }
+
+    void MatrixSaverFile::PartSaveFinish(void)
+    {
+        if(getVersion() == -1)
+        {
+            return;
+        }
+
+        assert(m_Step == 3);
+
+        MatrixSaverStream::PartSaveFinish();
+
+        m_MainFileStream.close();
+
+        assert(m_Step == 0);
+    }
+
+    //version==-1 implies no saving
+    MatrixSaverFile::MatrixSaverFile(const std::string &inFileNamePrefix, int inVersion)
+    {
+        m_Step = 0;
+        Reset(NULL, inVersion, inFileNamePrefix);
+    }
+
+    void MatrixSaverFile::Reset(const std::string &inFileNamePrefix, int inVersion)
+    {
+        assert(getStep() == 0);
+
+        Reset(NULL, inVersion, inFileNamePrefix);
+    }
+    void MatrixSaverFile::Reset(std::ostream *inStream, int inVersion, const std::string &inFileNamePrefix)
+    {
+        MatrixSaverStream::Reset(inStream, inVersion, inFileNamePrefix);
+    }
+
+
+
+
+    MatrixLoaderStream::MatrixLoaderStream(std::istream *inStream)
+    {
+        Reset(inStream);
+    }
+    MatrixLoaderStream::~MatrixLoaderStream(void)
+    {
+        assert(getStep() == 0);
+    }
+
+    void MatrixLoaderStream::Reset(std::istream *inStream)
+    {
+        assert(getStep() == 0);
+        m_MainStream = inStream;
+    }
+
+    void MatrixLoaderStream::LoadComplete(MatrixCpu &outMatrix)
+    {
+        assert(getStep() == 0);
+
+        PartLoadInit();
+        t_index x, y;
+        PartLoadHeader(x, y);
+        PartLoadBatch(outMatrix, x);
+        PartLoadFinish();
+
+        assert(getStep() == 0);
+    }
+
+    int MatrixLoaderStream::getStep(void) const
+    {
+        return m_Step;
+    }
+
+    void MatrixLoaderStream::PartLoadInit(void)
+    {
+        assert(getStep() == 0);
+
+        assert(m_MainStream != NULL);
+
+        //TODO
+
+        m_Step = 1;
+    }
+
+    void MatrixLoaderStream::PartLoadHeader(t_index &outX, t_index &outY)
+    {
+        assert(getStep() == 1);
+
+        m_SecondFile = "";
+
+        std::string header;
+        std::getline(*m_MainStream, header, '\n');
+    
+        const t_index lm = 6; //len("Matrix")
+    
+        if(header.substr(0, lm) == "Matrix")
+        {
+            std::stringstream hs(header.substr(lm, header.size() - lm));
+    
+            hs >> m_Version;
+            if(m_Version == 1)//images ~ binary saved bytes => divide each value by 255
+            {
+                std::getline(*m_MainStream, header, '\n');
+                hs.str(header);
+                hs >> outX >> outY;
+    
+            }
+            else if (m_Version == 2)//binary saved floats
+            {
+                std::getline(*m_MainStream, header, '\n');
+                hs.str(header);
+                hs >> outX >> outY;
+            }
+            else if (m_Version == 3)//only header -> binary saved floats are in other file
+            {
+                std::getline(*m_MainStream, header, '\n');
+                hs.str(header);
+                hs >> outX >> outY;
+                lv(*m_MainStream, "DataFile", m_SecondFile);
+            }
+            else
+            {
+                std::stringstream e;
+                e << "Matrix version [" << m_Version << "] is unknown!" << std::endl;
+
+                throw std::runtime_error(e.str());
+            }
+        }
+        else//oldest-version
+        {
+            m_Version = 0;
+            std::stringstream hs(header);
+            hs >> outX >> outY;
+        }
+        
+        std::cout << "version = " << m_Version << ", size = " << outX << " x " << outY << std::endl;
+
+        assert(m_X > 0 && m_Y > 0);
+        m_ReadX = 0;
+
+        m_Step = 2;
+    }
+
+    //returns true while there is stil something to read
+    bool MatrixLoaderStream::PartLoadBatch(MatrixCpu &outMatrix, t_index inMaxBatchSize, bool inTransposed)
+    {
+        assert(getStep() == 2 || getStep() == 3);
+
+        //std::istream &MatrixCpu::LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName)
+
+        t_index batchSize = std::min(inMaxBatchSize, m_X - m_ReadX);
+
+#define IDX2C(i,j,ld) (((j)*(ld))+(i))
+
+        //VERSION 0 ======================
+        //floats in text format separated by spaces
+        if(m_Version == 0)
+        {
+            if(!inTransposed)
+            {
+                outMatrix.Reset(batchSize, m_Y);
+
+                for(t_index i = 0; i < batchSize; ++i)
+                {
+                    for(t_index j = 0; j < m_Y; ++j)
+                    {
+                        (*m_MainStream) >> outMatrix.m_Data[IDX2C(i, j, m_X)];
+                    }
+                    printProgress(i, batchSize);
+                }
+            }
+            else
+            {
+                outMatrix.Reset(m_Y, batchSize);
+                for(t_index i = 0; i < batchSize; ++i)
+                {
+                    for(t_index j = 0; j < m_Y; ++j)
+                    {
+                        (*m_MainStream) >> outMatrix.m_Data[IDX2C(j, i, m_Y)];
+                    }
+                    printProgress(i, batchSize);
+                }
+            }
+        }
+        //VERSION 1 ======================
+        //images ~ binary saved bytes => divide each value by 255
+        else if(m_Version == 1)
+        {
+            uint8_t d[m_Y];
+    
+            if(!inTransposed)
+            {
+                outMatrix.Reset(batchSize, m_Y);
+
+                for(t_index i = 0; i < batchSize; ++i)
+                {
+                    m_MainStream->read((char*)d, m_Y);
+    
+                    for(t_index j = 0; j < m_Y; ++j)
+                    {
+                        outMatrix.m_Data[IDX2C(i, j, m_X)] = d[j]/255.0f;
+                    }
+
+                    printProgress(i, batchSize);
+                }
+            }
+            else
+            {
+                outMatrix.Reset(m_Y, batchSize);
+
+                for(t_index i = 0; i < batchSize; ++i)
+                {
+                    m_MainStream->read((char*)d, m_Y);
+    
+                    for(t_index j = 0; j < m_Y; ++j)
+                    {
+                        outMatrix.m_Data[IDX2C(j, i, m_Y)] = d[j]/255.0f;
+                    }
+                    printProgress(i, batchSize);
+                }
+            }
+        }
+        //VERSION 2 and 3 ======================
+        //binary saved floats
+        else if (m_Version == 2 || m_Version == 3)
+        {
+            //the only possibility to map file into memory
+            if(m_Version == 3 && m_SecondFile != "-" && batchSize == m_X)
+            {
+                //TODO: mmap
+            }
+            else
+            {
+                std::istream &actStream = (m_Version == 3 && m_SecondFile != "-") ? m_SecondStream : (*m_MainStream);
+                float d[m_Y];
+    
+                t_index sizeOfSavedFloat = 4;
+                assert(sizeof(float) == sizeOfSavedFloat);
+    
+                if(!inTransposed)
+                {
+                    outMatrix.Reset(batchSize, m_Y);
+
+                    for(t_index i = 0; i < batchSize; ++i)
+                    {
+                        actStream.read((char*)d, m_Y*sizeOfSavedFloat);
+    
+                        for(t_index j = 0; j < m_Y; ++j)
+                        {
+                            outMatrix.m_Data[IDX2C(i, j, m_X)] = d[j];
+                        }
+                        printProgress(i, batchSize);
+                    }
+                }
+                else
+                {
+                    outMatrix.Reset(m_Y, batchSize);
+
+                    for(t_index i = 0; i < batchSize; ++i)
+                    {
+                        actStream.read((char*)d, m_Y*sizeOfSavedFloat);
+    
+                        for(t_index j = 0; j < m_Y; ++j)
+                        {
+                            outMatrix.m_Data[IDX2C(j, i, m_Y)] = d[j];
+                        }
+                        printProgress(i, batchSize);
+                    }
+                }
+            }
+        }
+        else
+        {
+            std::stringstream e;
+            e << "Matrix version [" << m_Version << "] is unknown!" << std::endl;
+
+            throw std::runtime_error(e.str());
+        }
+
+        m_ReadX += batchSize;
+
+        m_Step = 3;
+
+        return m_ReadX < m_X;
+    }
+
+    void MatrixLoaderStream::PartLoadFinish(void)
+    {
+        assert(getStep() == 3 || getStep() == 3);
+
+        if(m_Version == 3 && m_SecondFile != "-")
+        {
+            m_SecondStream.close();
+        }
+        
+        m_Step = 0;
+    }
+
+    MatrixLoaderFile::MatrixLoaderFile(const std::string &inFileName)
+    {
+        Reset(inFileName);
+    }
+
+    void MatrixLoaderFile::Reset(const std::string &inFileName)
+    {
+        assert(getStep() == 0);
+
+        m_FileName = inFileName;
+    }
+
+    void MatrixLoaderFile::PartLoadInit(void)
+    {
+        assert(getStep() == 0);
+        assert(m_FileName != "");
+
+        m_MainFileStream.open(m_FileName.c_str());
+
+        Reset(&m_MainFileStream);
+
+        MatrixLoaderStream::PartLoadInit();
+
+        assert(m_Step == 1);
+    }
+
+    void MatrixLoaderFile::PartLoadFinish(void)
+    {
+        assert(getStep() == 2 || getStep() == 3);
+
+        MatrixLoaderStream::PartLoadFinish();
+
+        assert(getStep() == 0);
+
+        m_MainFileStream.close();
+    }
+
+    void MatrixLoaderFile::Reset(std::istream *inStream)
+    {
+        assert(getStep() == 0);
+
+        MatrixLoaderStream::Reset(inStream);
+    }
+
 }
 
 void msgC(const char * inMsg, const YAMATH::MatrixCpu &x)

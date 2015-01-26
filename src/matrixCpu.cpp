@@ -499,7 +499,7 @@ namespace YAMATH
         : m_MainStream(NULL)
           , m_SecondStream()
     {
-        m_Step == 0;
+        m_Step = 0;
 
         Reset(inStream, inVersion, inFileNamePrefix);
     }
@@ -670,7 +670,7 @@ namespace YAMATH
             throw std::runtime_error(e.str());
         }
 
-        m_Step == 3;
+        m_Step = 3;
     }
 
     void MatrixSaverStream::PartSaveFinish(void)
@@ -752,6 +752,7 @@ namespace YAMATH
 
     MatrixLoaderStream::MatrixLoaderStream(std::istream *inStream)
     {
+        m_Step = 0;
         Reset(inStream);
     }
     MatrixLoaderStream::~MatrixLoaderStream(void)
@@ -800,6 +801,7 @@ namespace YAMATH
 
         std::string header;
         std::getline(*m_MainStream, header, '\n');
+        //std::cout << "header1 [" << header << "]" << std::endl;
     
         const t_index lm = 6; //len("Matrix")
     
@@ -811,20 +813,27 @@ namespace YAMATH
             if(m_Version == 1)//images ~ binary saved bytes => divide each value by 255
             {
                 std::getline(*m_MainStream, header, '\n');
-                hs.str(header);
+                std::stringstream hs(header);
+                //hs.str(header);
                 hs >> outX >> outY;
     
             }
             else if (m_Version == 2)//binary saved floats
             {
                 std::getline(*m_MainStream, header, '\n');
-                hs.str(header);
+                //std::cout << "header2 [" << header << "]" << std::endl;
+                std::stringstream hs(header);
+                //hs.str(header);
+                //std::cout << "stream [" << hs.str() << "]" << std::endl;
+                //std::cout << "uninited [" << outX << " x " << outY << "]" << std::endl;
                 hs >> outX >> outY;
+                //std::cout << "loaded [" << outX << " x " << outY << "]" << std::endl;
             }
             else if (m_Version == 3)//only header -> binary saved floats are in other file
             {
                 std::getline(*m_MainStream, header, '\n');
-                hs.str(header);
+                std::stringstream hs(header);
+                //hs.str(header);
                 hs >> outX >> outY;
                 lv(*m_MainStream, "DataFile", m_SecondFileName);
             }
@@ -844,6 +853,9 @@ namespace YAMATH
         }
         
         std::cout << "version = " << m_Version << ", size = " << outX << " x " << outY << std::endl;
+
+        m_X = outX;
+        m_Y = outY;
 
         assert(m_X > 0 && m_Y > 0);
         m_ReadX = 0;

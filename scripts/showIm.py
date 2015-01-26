@@ -30,7 +30,7 @@ if len(sys.argv) == 4:
 f = open(sys.argv[1])
 
 #read header
-header = f.next()
+header = f.readline()
 if header.startswith("Matrix"):
     version = int(header.strip().split(" ")[1])
 else:
@@ -39,7 +39,7 @@ else:
 print "Version:", version
 
 if version in [1, 2, 3]:
-    sizeInfo = f.next()
+    sizeInfo = f.readline()
 else:
     sizeInfo = header
 
@@ -88,6 +88,7 @@ for jj in xrange(stop-start+1):
 
     r = np.clip(r, 0, 255)
     r = list(np.array(r).astype(int))
+    r = np.clip(r, 0, 255)
     
     d = zip(r[0::3], r[1::3], r[2::3])
 
@@ -103,5 +104,6 @@ for jj in xrange(stop-start+1):
         ii.show()
         time.sleep(0.3)
     except:
-        print "bad"
+        print "bad", d
+        raise
 

@@ -4,6 +4,7 @@ from PIL import Image as im
 import numpy as np
 import sys
 import time
+import struct
 
 size = (200, 200)
 start = 1
@@ -25,19 +26,66 @@ if len(sys.argv) == 4:
     start = int(sys.argv[2])
     stop = int(sys.argv[3])
 
+
 f = open(sys.argv[1])
 
-f.next()
-f.next()
+#read header
+header = f.next()
+if header.startswith("Matrix"):
+    version = int(header.strip().split(" ")[1])
+else:
+    version = 0
 
-assert start > 0
+print "Version:", version
 
-for jj in xrange(start-1):
-    f.next()
+if version in [1, 2, 3]:
+    sizeInfo = f.next()
+else:
+    sizeInfo = header
+
+x, y = map(int, sizeInfo.strip().split(" "))
+print "size:", x, "x", y
+
+if version == 3:
+    data = f.next()
+    data = data.strip().split(" ", 1)[1]
+    print "loading referenced file:", data
+    f.close()
+    f = open(data)
+else:
+    data = f
+
+assert start > 0 and stop <= x
+
+if version == 0:
+    for jj in xrange(start-1):
+        f.next()
+elif version in [2, 3]:
+    fs = "<" + "f"*(y)
+    
+    dSize = struct.calcsize(fs)
+
+    f.seek((start-1)*dSize, 1)
+
+    #for i in xrange(start-1):
+    #    try:
+    #        r = struct.unpack(fs, f.read(dSize))
+    #    except:
+    #        raise
+else:
+    raise Exception("Version " + str(version) + "not implemented")
 
 for jj in xrange(stop-start+1):
-    j = f.next()
-    r = [float(i)*255 for i in j.split(" ")]
+    if version == 0:
+        j = f.next()
+        r = [float(i)*255 for i in j.split(" ")]
+    elif version in [2, 3]:
+        try:
+            r = struct.unpack(fs, f.read(dSize))
+        except:
+            raise
+        r = [i*255 for i in r]
+
     r = np.clip(r, 0, 255)
     r = list(np.array(r).astype(int))
     

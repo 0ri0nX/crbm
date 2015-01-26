@@ -116,7 +116,7 @@ int main(int argc, char** argv)
     else
     {
         outFilename += ".reconstruct";
-        saver.Reset(outFilename, 0);
+        saver.Reset(outFilename, 2);
         resSize = cols;
     }
 

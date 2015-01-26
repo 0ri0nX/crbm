@@ -428,7 +428,7 @@ namespace CRBM
     
         YAMATH::MatrixCpu rr = r3;
     
-        float res = rr.getDataConst()[0]/(inInp.getX()*inInp.getY());
+        float res = sqrt(rr.getDataConst()[0])/(inInp.getX()*inInp.getY());
 
         //if(res != res)
         if(isnan(res) || isinf(res))

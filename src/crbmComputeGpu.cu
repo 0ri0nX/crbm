@@ -109,7 +109,7 @@ int main(int argc, char** argv)
     else
     {
         outFilename += ".reconstruct";
-        saver.Reset(outFilename, 2);
+        saver.Reset(outFilename, 3);
         resSize = cols;
     }
 

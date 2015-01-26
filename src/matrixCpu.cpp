@@ -886,7 +886,7 @@ namespace YAMATH
                 {
                     for(t_index j = 0; j < m_Y; ++j)
                     {
-                        (*m_MainStream) >> outMatrix.m_Data[IDX2C(i, j, m_X)];
+                        (*m_MainStream) >> outMatrix.m_Data[IDX2C(i, j, batchSize)];
                     }
                     printProgress(i, batchSize);
                 }
@@ -920,7 +920,7 @@ namespace YAMATH
     
                     for(t_index j = 0; j < m_Y; ++j)
                     {
-                        outMatrix.m_Data[IDX2C(i, j, m_X)] = d[j]/255.0f;
+                        outMatrix.m_Data[IDX2C(i, j, batchSize)] = d[j]/255.0f;
                     }
 
                     printProgress(i, batchSize);
@@ -986,7 +986,7 @@ namespace YAMATH
     
                         for(t_index j = 0; j < m_Y; ++j)
                         {
-                            outMatrix.m_Data[IDX2C(i, j, m_X)] = d[j];
+                            outMatrix.m_Data[IDX2C(i, j, batchSize)] = d[j];
                         }
                         printProgress(i, batchSize);
                     }

@@ -1,6 +1,13 @@
+if(CUDA_FOUND)
+    add_definitions(-DCUDA)
+    CUDA_ADD_LIBRARY(crbmComputerGpu SHARED crbmComputer.cu "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)
+    remove_definitions(-DCUDA)
+endif()
+
 add_definitions(-DSQUEEZE)
 add_library(crbmComputerCpu SHARED crbmComputer.cpp "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)
 add_library(crbmComputerCpuStatic STATIC crbmComputer.cpp "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)
+
 
 target_link_libraries(crbmComputerCpu blas rt)
 

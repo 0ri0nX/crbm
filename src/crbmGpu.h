@@ -216,7 +216,7 @@ namespace CRBM
         {
             for(int i = 0; i < tot; ++i)
             {
-                std::cout << " " << fixed << n.getDataConst()[i] - m.getDataConst()[i];
+                std::cout << " " << std::fixed << n.getDataConst()[i] - m.getDataConst()[i];
             }
             std::cout << std::endl;
         }

@@ -13,14 +13,13 @@ namespace CRBM
     
             CRBMLayerGpu(void) : CRBMLayer() {}
             CRBMLayerGpu(const CRBMLayerSetting &inSetting);
-
-            //main data matrix is in GPU memory
-            float LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName = "");
-
+            
             //main data matrix is in CPU memory
             float LearnAll(const YAMATH::MatrixCpu &inData, const std::string &inBackupFileName = "", bool inputTransposed = false);
+            float LearnAll(const YAMATH::MatrixGpu &inData, const std::string &inBackupFileName = "");
 
             float LearnBatch(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &inOutLastWeights);
+
             void Transform(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData) const;
             void Reconstruct(const YAMATH::MatrixGpu &inData, YAMATH::MatrixGpu &outData);
     
@@ -37,11 +36,14 @@ namespace CRBM
             void UpperLayer2RawOutput(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const;
     
             void ActivationFunction(YAMATH::MatrixGpu &inData, int inFunctionType) const;
+            void Sample(YAMATH::MatrixGpu &inData, int inFunctionType) const;
     
             virtual void SaveSpecific(std::ostream &outStream) const;
             virtual void LoadSpecific(std::istream &inStream);
 
             virtual void ResetWeights(void);
+
+            void Test(void);
     
          protected:
             YAMATH::MatrixGpu m_Weights;
@@ -186,6 +188,40 @@ namespace CRBM
         int num = numImages*m_Normalizer.getY();
         blocks = (num - 1) / ThreadsPerBlock + 1;
         YAMATH::applyFunction<<<blocks, ThreadsPerBlock>>>(m_Normalizer.getData(), m_Normalizer.getDataConst(), num, YAMATH::EFE_InverseAndMultiply, 1.0f);
+    }
+
+    void CRBMLayerGpu::Test(void)
+    {
+        int tot = 3*200*200;
+        int bat = 10;
+        YAMATH::MatrixCpu m(bat, tot), n;
+        std::cout << std::endl;
+        for(int j = 0; j < bat; ++j)
+        {
+            for(int i = 0; i < tot; ++i)
+            {
+                m.getData()[i] = i+j;
+                std::cout << " " << i+j;
+            }
+            std::cout << std::endl;
+        }
+        YAMATH::MatrixGpu a,b,c;
+        a = m;
+        Convolve(a, b);
+        DeConvolve(b, c);
+
+        n = c;
+        std::cout << std::endl;
+        for(int j = 0; j < bat; ++j)
+        {
+            for(int i = 0; i < tot; ++i)
+            {
+                std::cout << " " << fixed << n.getDataConst()[i] - m.getDataConst()[i];
+            }
+            std::cout << std::endl;
+        }
+
+        std::cout << std::endl;
     }
 
     void CRBMLayerGpu::DeConvolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch)
@@ -626,16 +662,22 @@ namespace CRBM
 
             ActivationFunction(y, s().activationFunctionH);
             testNan(y);
+            Sample(y, s().activationFunctionH);
+            testNan(y);
 
             x2 = Mult(y, m_Weights.T());
             testNan(x2);
             ActivationFunction(x2, s().activationFunctionV);
             testNan(x2);
+            Sample(x2, s().activationFunctionV);
+            testNan(y);
 
             y2 = Mult(x2, m_Weights);
             testNan(y2);
             ActivationFunction(y2, s().activationFunctionH);
             testNan(y2);
+            Sample(y2, s().activationFunctionH);
+            testNan(y);
 
             dw1 = Mult(x.T(), y);
             testNan(dw1);
@@ -718,6 +760,41 @@ namespace CRBM
                 break;
             default:
                 assert(0);// && "unknown activation function ID");
+        }
+    }
+
+    void CRBMLayerGpu::Sample(YAMATH::MatrixGpu &inData, int inFunctionType) const
+    {
+        if(s().gibbsSampling)
+        {
+            switch(inFunctionType)
+            {
+                case 0: //linear
+                    {
+                        YAMATH::MatrixGpu rnd(inData.getX(), inData.getY());
+                        rnd.RandNormal(0.0f, 0.1f);//TODO: get proper deviation
+                        inData = inData + rnd;
+                    }
+                    break;
+                case 1: //sigmoid
+                    inData.ProbabilityCoinFlip();
+                    break;
+                case 2: //rectified linear
+                    {
+                        YAMATH::MatrixGpu rnd(inData.getX(), inData.getY());
+                        rnd.RandNormal(0.0f, 0.1f);//TODO: get proper deviation
+                        //YAMATH::MatrixCpu tmp(rnd);
+                        //for(int i = 0; i < tmp.getY(); ++i)
+                        //{
+                        //    std::cout << " " << tmp.get(0, i);
+                        //}
+                        //std::cout << std::endl;
+                        inData = inData + rnd;
+                    }
+                    break;
+                default:
+                    assert(0);// && "unknown activation function ID");
+            }
         }
     }
 

@@ -47,6 +47,7 @@ namespace CRBM
 
             noiseCenterRange = 0.0f;//computes mean and dev of data. center of noise is range (0-noiseCenterRange)*dev
             noiseDevRange = 0.0f;//scale of noise is dev*noiseDevRange
+            gibbsSampling = false;
     
             //momentum = 0.9f;
             //dataLimit = 0;
@@ -86,6 +87,7 @@ namespace CRBM
             momentum        = loadOption(f, "momentum",                     momentum);
             noiseCenterRange= loadOption(f, "noiseCenterRange",             noiseCenterRange   );
             noiseDevRange   = loadOption(f, "noiseDevRange",                noiseDevRange   );
+            gibbsSampling   = loadOption(f, "gibbsSampling",                gibbsSampling);
         }
     
         //image-size
@@ -120,6 +122,8 @@ namespace CRBM
         float momentum;
         float noiseCenterRange;
         float noiseDevRange;
+
+        int gibbsSampling;
     };
 
 
@@ -241,7 +245,7 @@ namespace CRBM
 
     void CRBMLayer::Save(std::ostream &out) const
     {
-        int version = 7;
+        int version = 8;
 
         sv(out, "CRBMLayer", version);
 
@@ -282,13 +286,16 @@ namespace CRBM
         //7
         sv(out, "noiseCenterRange", s().noiseCenterRange);
         sv(out, "noiseDevRange", s().noiseDevRange);
+
+        //8
+        sv(out, "gibbsSampling", s().gibbsSampling);
     }
 
     void CRBMLayer::Load(std::istream &in)
     {
         int version = -1;
         int minVersion = 1;
-        int maxVersion = 7;
+        int maxVersion = 8;
         lvc(in, "CRBMLayer", minVersion, maxVersion, version);
 
         lv(in, "learningSpeed", m_Setting.learningRate);
@@ -337,6 +344,12 @@ namespace CRBM
             lv(in, "noiseCenterRange", m_Setting.noiseCenterRange);
             lv(in, "noiseDevRange", m_Setting.noiseDevRange);
         }
+
+        if(version >= 8)
+        {
+            lv(in, "gibbsSampling", m_Setting.gibbsSampling);
+        }
+
     }
 
     void CRBMLayer::Save(const std::string &inName) const

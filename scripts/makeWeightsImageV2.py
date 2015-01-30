@@ -12,6 +12,11 @@ import colorsys
 size = (10, 10)
 target = (8, 8)
 
+#size = (4, 4)
+#target = (8, 8)
+#rescale = False
+rescale = True
+
 def makeImage(filename, targetFilename):
     print filename, "->", targetFilename
 
@@ -25,7 +30,7 @@ def makeImage(filename, targetFilename):
             break
     
     print "window-size x features:", x, y
-    
+
     assert x == size[0]*size[1]*3
     
     fs = "<" + "f"*(y)
@@ -65,8 +70,6 @@ def makeImage(filename, targetFilename):
     
     mi = 0.0
     ma = 1.0
-    #rescale = False
-    rescale = True
 
     def getH(d):
         r = d[0::3]
@@ -100,6 +103,9 @@ def makeImage(filename, targetFilename):
     order = list(sorted(order, key = lambda x: x[0]))
 
     for i in xrange(min(limit, m.shape[0])):
+
+        #if i / target[0] != 0:
+        #    continue
    
         if False:
             r = m[order[i][1]]
@@ -112,6 +118,8 @@ def makeImage(filename, targetFilename):
             #print ma, mi
     
         r = np.clip(255.0*(r-mi)/(ma-mi), 0, 255).astype(int)
+        #for aa in range(3):
+        #    print (i,aa), " ".join([str(cc).rjust(3) for cc in r[aa::3]])
     
         #print r[:6]
     

@@ -7,15 +7,34 @@ import struct
 
 size = (200,200)
 
-if len(sys.argv) not in [3, 4]:
-    print sys.argv[0], "<output-file> <images-per-batch> [batch-limit]"
+if len(sys.argv) < 3:
+    print "Syntax:", sys.argv[0], "<output-file> <images-per-batch> [batch-limit] [--no-flip] [--no-noise] [--no-shrink] [--no-patches]"
     print "  Reads image-names from standard input and creates binary batches"
     exit(1)
 
+def getOption(opt):
+    try:
+        sys.argv.remove(opt)
+        print >> sys.stderr, "Option:", opt
+        return True
+    except:
+        return False
 
+noFlip = getOption("--no-flip")
+noNoise = getOption("--no-noise")
+noShrink = getOption("--no-shrink")
+noPatches = getOption("--no-patches")
+#noFlip = getOption("")
+
+if len(sys.argv) < 3:
+    print "Syntax:", sys.argv[0], "<output-file> <images-per-batch> [batch-limit] [--no-flip] [--no-noise] [--no-shrink] [--no-patches]"
+    exit(1)
 data = [i.strip() for i in sys.stdin]
 limit = int(sys.argv[2])
-batchLimit = int(sys.argv[3])
+if len(sys.argv) > 3:
+    batchLimit = int(sys.argv[3])
+else:
+    batchLimit = 1
 #data = data[:limit]
 
 VERSION = 3
@@ -44,35 +63,37 @@ def outputImage(f, fInfo, ii, name):
 #flip
 def outputImage1(f, fInfo, ii, name):
     outputImage2(f, fInfo, ii, name)
-    outputImage2(f, fInfo, ii.transpose(im.FLIP_LEFT_RIGHT), "LRFlip-"+name)
+    if not noFlip:
+        outputImage2(f, fInfo, ii.transpose(im.FLIP_LEFT_RIGHT), "LRFlip-"+name)
 
 #noise
 def outputImage2(f, fInfo, iiOrig, name):
-    #outputImageFinal(f, fInfo, iiOrig, name)
+    if noNoise:
+        outputImageFinal(f, fInfo, iiOrig, name)
+    else:
+        ii = im.new("RGB", (iiOrig.size))
 
-    ii = im.new("RGB", (iiOrig.size))
+        for i in range(1):
+            loc, scale, r, g, b = np.random.normal(size=(5), loc = 0.0, scale = 32.0)
 
-    for i in range(1):
-        loc, scale, r, g, b = np.random.normal(size=(5), loc = 0.0, scale = 32.0)
+            #noise = np.random.normal(size=(ii.size[0]*ii.size[1], 3), loc = 64.0*i, scale = 32.0).astype(int)
+            noise = np.random.normal(size=(ii.size[0]*ii.size[1], 3), loc = loc, scale = abs(scale))
+            noise[:,0] += r
+            noise[:,1] += g
+            noise[:,2] += b
 
-        #noise = np.random.normal(size=(ii.size[0]*ii.size[1], 3), loc = 64.0*i, scale = 32.0).astype(int)
-        noise = np.random.normal(size=(ii.size[0]*ii.size[1], 3), loc = loc, scale = abs(scale))
-        noise[:,0] += r
-        noise[:,1] += g
-        noise[:,2] += b
+            noise = noise.astype(int)
 
-        noise = noise.astype(int)
+            noise += iiOrig.getdata()
 
-        noise += iiOrig.getdata()
+            noise[noise < 0] = 0
+            noise[noise > 255] = 255
 
-        noise[noise < 0] = 0
-        noise[noise > 255] = 255
+            data = zip(noise[:,0], noise[:,1], noise[:,2])
 
-        data = zip(noise[:,0], noise[:,1], noise[:,2])
+            ii.putdata(data)
 
-        ii.putdata(data)
-
-        outputImageFinal(f, fInfo, ii, "noise" + str(i+1) + "-"+name)
+            outputImageFinal(f, fInfo, ii, "noise" + str(i+1) + "-"+name)
 
 def outputImageFinal(f, fInfo, ii, name):
     global idx
@@ -103,7 +124,11 @@ def outputImageFinal(f, fInfo, ii, name):
     idx += 1
 
 
-while len(data)*10 >= limit and batchLimit > 0:
+multiplier = ((not noShrink)+9*(not noPatches)) * (1 + (not noFlip))
+
+print >> sys.stderr, "From one image will be", multiplier, "training patterns"
+
+while len(data)*multiplier >= limit and batchLimit > 0:
     batchLimit -= 1
 
     if VERSION == 1 or VERSION == 2:
@@ -150,7 +175,7 @@ while len(data)*10 >= limit and batchLimit > 0:
 
 
         #resized
-        if True:
+        if not noShrink:
             outputImage(f, fInfo, ii, "resized\t" + iii)
 
         #9 subimages - deterministic
@@ -162,7 +187,7 @@ while len(data)*10 >= limit and batchLimit > 0:
                     outputImage(f, fInfo, ii.crop((i, j, i+edge, j+edge)), "patch" + iName + jName +"\t" + iii)
 
         #9 subimages - random
-        if True:
+        if not noPatches:
             emi = min(ii.size)
             ema = max(ii.size)
 

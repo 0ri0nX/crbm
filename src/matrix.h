@@ -406,6 +406,8 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 curandDestroyGenerator(prng);
             }
 
+            void ProbabilityCoinFlip(void);
+
             MatrixGpu &operator=(const OperationGpu &inOperation);
             MatrixGpu &operator=(float inFill);
             MatrixGpu &operator=(const MatrixCpu& inMatrix);
@@ -1340,21 +1342,48 @@ int MatrixGpu::m_Allocations = 0;
         return OperationMatrixApplyElementwise(*this, EFE_Maximally, inMax);
     }
 
-    __global__ void sample(float *outData, float *inData, float* inRnd, t_index x, t_index y, t_index N)
+    __global__ void probabilityCoinFlip(float *inOutData, float* inRnd, t_index n)
     {
         //target row id
         t_index rid = blockDim.x * blockIdx.x + threadIdx.x;
         
-        if (rid < N)
+        if (rid < n)
+        {
+            inOutData[rid] = inRnd[rid] <= inOutData[rid] ? 1.0f : 0.0f;
+        }
+    }
+
+    //expects matrix with values (0-1), flips each value to 1/0 depending on its probabiliy
+    void MatrixGpu::ProbabilityCoinFlip(void)
+    {
+        t_index size = getX()*getY();
+
+        MatrixGpu rnd(getX(), getY());
+        rnd.RandUniform();
+
+        static t_index ThreadsPerBlock = 256;
+
+        dim3 threadsPerBlock(ThreadsPerBlock, 1, 1);
+
+        dim3 blocksPerGrid((size - 1) / ThreadsPerBlock + 1, 1, 1);
+
+        probabilityCoinFlip<<<blocksPerGrid, threadsPerBlock>>>(getData(), rnd.getDataConst(), size);
+    }
+
+    __global__ void sample(float *outData, float *inData, float* inRnd, t_index x, t_index y, t_index n)
+    {
+        //target row id
+        t_index rid = blockDim.x * blockIdx.x + threadIdx.x;
+        
+        if (rid < n)
         {
             //random row-id
             t_index row = int(inRnd[rid]*x);
 
             for(t_index i = 0; i < y; ++i)
             {
-                outData[IDX2C(rid, i, N)] = inData[IDX2C(row, i, x)];
+                outData[IDX2C(rid, i, n)] = inData[IDX2C(row, i, x)];
             }
-
         }
     }
 

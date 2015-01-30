@@ -14,6 +14,7 @@ endif()
 
 add_executable(crbmComputeCpu crbmComputeCpu.cpp matrixCpu.cpp utils.cpp)
 target_link_libraries(crbmComputeCpu blas rt)
+set_target_properties(crbmComputeCpu PROPERTIES COMPILE_DEFINITIONS SQUEEZE)
 
 add_subdirectory(crbmComputer)
 

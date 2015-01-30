@@ -57,7 +57,8 @@ int main(int argc, char** argv)
     }
 
 
-    int cpuid = atoi(argv[1]);
+    //no effect
+    //int cpuid = atoi(argv[1]);
 
     string computationType = argv[2];
     if(computationType != "reconstruct" && computationType != "transform" && computationType != "reconstructionError")
@@ -170,7 +171,7 @@ int main(int argc, char** argv)
 
         timer.tic();
         timer2.tic();
-        for(int i = 0; i < layers.size(); ++i)
+        for(unsigned int i = 0; i < layers.size(); ++i)
         {
             timer.tic();
             cout << "   Transforming with layer " << i+1 << flush;

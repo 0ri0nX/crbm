@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iomanip>
 #include <cstdlib>
-#include <cassert>
 #include <string>
 #include <time.h>
 #include <csignal>
@@ -142,11 +141,11 @@ int main(int argc, char** argv)
 
         if(proceed)
         {
-            assert(batch < batchNum);
+            ASSERT(batch < batchNum);
         }
         else
         {
-            assert(batch == batchNum);
+            ASSERT(batch == batchNum);
         }
 
         xx = xxCpu;

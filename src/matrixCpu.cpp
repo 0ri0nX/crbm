@@ -7,7 +7,6 @@
 #include <sstream>
 #include <stdint.h>
 #include <stdint.h>
-#include <cassert>
 #include <cstdio>
 #include <stdexcept>
 
@@ -45,6 +44,8 @@ namespace YAMATH
         {
             getData()[i] = inVal;
         }
+
+        return *this;
     }
 
     MatrixCpu &MatrixCpu::operator=(const MatrixCpu &inMatrix)
@@ -75,7 +76,7 @@ namespace YAMATH
             }
         }
 #else
-        assert(0);
+        ASSERT(0);
 #endif
     }
   
@@ -117,7 +118,7 @@ namespace YAMATH
             }
         }
 #else
-        assert(0);
+        ASSERT(0);
 #endif
     }
 
@@ -271,7 +272,7 @@ namespace YAMATH
             float d[y];
     
             t_index sizeOfSavedFloat = 4;
-            assert(sizeof(float) == sizeOfSavedFloat);
+            ASSERT(sizeof(float) == sizeOfSavedFloat);
     
             if(!inTransposed)
             {
@@ -323,7 +324,7 @@ namespace YAMATH
         }
         else
         {
-            assert(0);
+            ASSERT(0);
         }
 
         setCached(x*y, true);
@@ -336,6 +337,8 @@ namespace YAMATH
         MatrixLoaderStream loader(&inStream);
 
         loader.LoadComplete(*this, inTransposed);
+
+        return inStream;
     }
     
     /*std::ostream &MatrixCpu::SaveHeader(std::ostream &outStream, t_index expectedRows, t_index expectedCols, int version)
@@ -372,6 +375,8 @@ namespace YAMATH
         MatrixSaverStream saver(&outStream, 2);
 
         saver.SaveComplete(*this);
+
+        return outStream;
     }
 /*
         if(addHeaderInfo)
@@ -406,13 +411,13 @@ namespace YAMATH
         else if(version == 2 || version == 3)
         {
             //t_index sizeOfSavedt_index = 4, x = m_X, y = m_Y;
-            //assert(sizeof(int) == sizeOfSavedInt);
+            //ASSERT(sizeof(int) == sizeOfSavedInt);
 
             //outStream.write((char*)&x, sizeOfSavedInt);
             //outStream.write((char*)&y, sizeOfSavedInt);
 
             t_index sizeOfSavedFloat = 4;
-            assert(sizeof(float) == sizeOfSavedFloat);
+            ASSERT(sizeof(float) == sizeOfSavedFloat);
             float d[m_Y];
 
             for(t_index i = 0; i < m_X; ++i)
@@ -465,6 +470,8 @@ namespace YAMATH
         {
             getData()[i] *= inB.getDataConst()[i];
         }
+
+        return *this;
     }
 
     MatrixCpu Mult(const MatrixCpu &inA, const MatrixCpu &inB, bool transposedA, bool transposedB)//matrix multiplication!
@@ -475,7 +482,7 @@ namespace YAMATH
         t_index kB = !transposedB ? inB.getX() : inB.getY();
 
         //cout << "TA:" << inA.isTrans() << ", TB:" << inB.isTrans() << endl;
-        assert(kA == kB);
+        ASSERT(kA == kB);
 
         MatrixCpu outMatrix(x, y);
 
@@ -506,13 +513,13 @@ namespace YAMATH
 
     MatrixSaverStream::~MatrixSaverStream(void)
     {
-        assert(m_Step == 0);
+        ASSERT(m_Step == 0);
     }
 
 
     void MatrixSaverStream::Reset(std::ostream *inStream, int inVersion, const std::string &inFileNamePrefix)
     {
-        assert(m_Step == 0);
+        ASSERT(m_Step == 0);
 
         m_MainStream = inStream;
         m_Prefix = inFileNamePrefix;
@@ -549,7 +556,7 @@ namespace YAMATH
             return;
         }
 
-        assert(m_Step == 0);
+        ASSERT(m_Step == 0);
 
         if(getVersion() == 3)
         {
@@ -569,7 +576,7 @@ namespace YAMATH
             return;
         }
 
-        assert(m_Step == 1);
+        ASSERT(m_Step == 1);
 
         if(getVersion() == 0)
         {
@@ -618,7 +625,7 @@ namespace YAMATH
             return;
         }
 
-        assert(m_Step == 2 || m_Step == 3);
+        ASSERT(m_Step == 2 || m_Step == 3);
 
         if(getVersion() == 0)
         {
@@ -649,7 +656,7 @@ namespace YAMATH
             std::ostream &outStream = (getVersion() == 3 && m_Prefix != "-") ? m_SecondStream : (*m_MainStream);
 
             t_index sizeOfSavedFloat = 4;
-            assert(sizeof(float) == sizeOfSavedFloat);
+            ASSERT(sizeof(float) == sizeOfSavedFloat);
             float d[inMatrix.m_Y];
 
             for(t_index i = 0; i < inMatrix.m_X; ++i)
@@ -680,7 +687,7 @@ namespace YAMATH
             return;
         }
 
-        assert(m_Step == 3);
+        ASSERT(m_Step == 3);
 
         if(getVersion() == 3)
         {
@@ -700,7 +707,7 @@ namespace YAMATH
             return;
         }
 
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
         std::string name = getPrefix() + ".dat";
 
@@ -710,7 +717,7 @@ namespace YAMATH
 
         MatrixSaverStream::PartSaveInit();
 
-        assert(m_Step == 1);
+        ASSERT(m_Step == 1);
     }
 
     void MatrixSaverFile::PartSaveFinish(void)
@@ -720,13 +727,13 @@ namespace YAMATH
             return;
         }
 
-        assert(m_Step == 3);
+        ASSERT(m_Step == 3);
 
         MatrixSaverStream::PartSaveFinish();
 
         m_MainFileStream.close();
 
-        assert(m_Step == 0);
+        ASSERT(m_Step == 0);
     }
 
     //version==-1 implies no saving
@@ -738,7 +745,7 @@ namespace YAMATH
 
     void MatrixSaverFile::Reset(const std::string &inFileNamePrefix, int inVersion)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
         Reset(NULL, inVersion, inFileNamePrefix);
     }
@@ -757,18 +764,18 @@ namespace YAMATH
     }
     MatrixLoaderStream::~MatrixLoaderStream(void)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
     }
 
     void MatrixLoaderStream::Reset(std::istream *inStream)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
         m_MainStream = inStream;
     }
 
     void MatrixLoaderStream::LoadComplete(MatrixCpu &outMatrix, bool inTransposed)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
         PartLoadInit();
         t_index x, y;
@@ -776,7 +783,7 @@ namespace YAMATH
         PartLoadBatch(outMatrix, x, inTransposed);
         PartLoadFinish();
 
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
     }
 
     int MatrixLoaderStream::getStep(void) const
@@ -786,16 +793,16 @@ namespace YAMATH
 
     void MatrixLoaderStream::PartLoadInit(void)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
-        assert(m_MainStream != NULL);
+        ASSERT(m_MainStream != NULL);
 
         m_Step = 1;
     }
 
     void MatrixLoaderStream::PartLoadHeader(t_index &outX, t_index &outY)
     {
-        assert(getStep() == 1);
+        ASSERT(getStep() == 1);
 
         m_SecondFileName = "";
 
@@ -857,7 +864,7 @@ namespace YAMATH
         m_X = outX;
         m_Y = outY;
 
-        assert(m_X > 0 && m_Y > 0);
+        ASSERT(m_X > 0 && m_Y > 0);
         m_ReadX = 0;
 
         m_Step = 2;
@@ -866,7 +873,7 @@ namespace YAMATH
     //returns true while there is stil something to read
     bool MatrixLoaderStream::PartLoadBatch(MatrixCpu &outMatrix, t_index inMaxBatchSize, bool inTransposed)
     {
-        assert(getStep() == 2 || getStep() == 3);
+        ASSERT(getStep() == 2 || getStep() == 3);
 
         //std::istream &MatrixCpu::LoadBatch(std::istream &inStream, bool inTransposed, int inVersion, t_index x, t_index y, const std::string &inCacheFileName)
 
@@ -974,7 +981,7 @@ namespace YAMATH
                 float d[m_Y];
     
                 t_index sizeOfSavedFloat = 4;
-                assert(sizeof(float) == sizeOfSavedFloat);
+                ASSERT(sizeof(float) == sizeOfSavedFloat);
     
                 if(!inTransposed)
                 {
@@ -1025,7 +1032,7 @@ namespace YAMATH
 
     void MatrixLoaderStream::PartLoadFinish(void)
     {
-        assert(getStep() == 3 || getStep() == 3);
+        ASSERT(getStep() == 3 || getStep() == 3);
 
         if(m_SecondStream.is_open())
         {
@@ -1042,15 +1049,15 @@ namespace YAMATH
 
     void MatrixLoaderFile::Reset(const std::string &inFileName)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
         m_FileName = inFileName;
     }
 
     void MatrixLoaderFile::PartLoadInit(void)
     {
-        assert(getStep() == 0);
-        assert(m_FileName != "");
+        ASSERT(getStep() == 0);
+        ASSERT(m_FileName != "");
 
         m_MainFileStream.open(m_FileName.c_str());
 
@@ -1058,23 +1065,23 @@ namespace YAMATH
 
         MatrixLoaderStream::PartLoadInit();
 
-        assert(m_Step == 1);
+        ASSERT(m_Step == 1);
     }
 
     void MatrixLoaderFile::PartLoadFinish(void)
     {
-        assert(getStep() == 2 || getStep() == 3);
+        ASSERT(getStep() == 2 || getStep() == 3);
 
         MatrixLoaderStream::PartLoadFinish();
 
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
         m_MainFileStream.close();
     }
 
     void MatrixLoaderFile::Reset(std::istream *inStream)
     {
-        assert(getStep() == 0);
+        ASSERT(getStep() == 0);
 
         MatrixLoaderStream::Reset(inStream);
     }

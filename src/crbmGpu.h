@@ -67,7 +67,7 @@ namespace CRBM
     //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
     void CRBMLayerGpu::Convolve(const YAMATH::MatrixGpu &inBatch, YAMATH::MatrixGpu &outBatch) const
     {
-        assert(inBatch.getY() == s().x*s().y*s().z);
+        ASSERT(inBatch.getY() == s().x*s().y*s().z);
 
         //horizontal and vertical number of patches
         int nh, nv;
@@ -245,7 +245,7 @@ namespace CRBM
 
         int numImages = inBatch.getX() / (nh*nv);
 
-        assert(inBatch.getY() == s().cx*s().cy*s().z);
+        ASSERT(inBatch.getY() == s().cx*s().cy*s().z);
 
         outBatch.Reset(numImages , s().x*s().y*s().z);
 
@@ -437,7 +437,7 @@ namespace CRBM
         r = inInp.Sum();
         YAMATH::MatrixCpu rr = r;
 
-        assert(inInp.getX()*inInp.getY() > 0);
+        ASSERT(inInp.getX()*inInp.getY() > 0);
     
         float res = rr.getDataConst()[0]/(inInp.getX()*inInp.getY());
 
@@ -451,7 +451,7 @@ namespace CRBM
             //    cout << " " << zz.getDataConst()[i];
             //}
 
-            assert(0);
+            ASSERT(0);
         }
     }
 
@@ -759,7 +759,7 @@ namespace CRBM
                 inData = inData.Minimally(0.0f);
                 break;
             default:
-                assert(0);// && "unknown activation function ID");
+                ASSERT(0);// && "unknown activation function ID");
         }
     }
 

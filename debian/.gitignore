@@ -1,0 +1,12 @@
+files
+pycompat
+python-module-stampdir
+*.debhelper.log
+*.substvars
+*.debhelper
+/python-szn-libcrbmcomputercpu
+/szn-libcrbmcomputercpu-dev
+/szn-libcrbmcomputercpu-example
+/szn-libcrbmcomputercpu0
+/tmp
+stamp-makefile-*

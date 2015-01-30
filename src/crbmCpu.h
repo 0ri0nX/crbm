@@ -58,7 +58,7 @@ namespace CRBM
     //it is expected that matrix has m.x==num.of.images and m.y == x*y*z
     void CRBMLayerCpu::Convolve(const YAMATH::MatrixCpu &inBatch, YAMATH::MatrixCpu &outBatch) const
     {
-        assert(inBatch.getY() == s().x*s().y*s().z);
+        assert(inBatch.getY() == YAMATH::t_index(s().x*s().y*s().z));
 
         //horizontal and vertical number of patches
         int nh, nv;
@@ -114,7 +114,7 @@ namespace CRBM
     void CRBMLayerCpu::SetDeConvolveNormalizer(int numImages)
     {
         //is already propetly set
-        if(m_Normalizer.getX() == numImages && m_Normalizer.getY() == s().x*s().y*s().z)
+        if(m_Normalizer.getX() == YAMATH::t_index(numImages) && m_Normalizer.getY() == YAMATH::t_index(s().x*s().y*s().z))
         {
             return;
         }
@@ -179,7 +179,7 @@ namespace CRBM
 
         int numImages = inBatch.getX() / (nh*nv);
 
-        assert(inBatch.getY() == s().cx*s().cy*s().z);
+        assert(inBatch.getY() == YAMATH::t_index(s().cx*s().cy*s().z));
 
         outBatch.Reset(numImages , s().x*s().y*s().z);
 
@@ -274,7 +274,7 @@ namespace CRBM
         int numImages = (inBatch.getX()*inBatch.getY()) / (nh*nv*s().hidden);
 
         int numPatches = nh*nv;
-        int total = inBatch.getX()*inBatch.getY();
+        //YAMATH::t_index total = inBatch.getX()*inBatch.getY();
 
         //res must be patches-number*rest ?
         outBatch.Reset(numPatches*numImages, s().hidden);

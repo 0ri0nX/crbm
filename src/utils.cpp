@@ -39,7 +39,7 @@ void lv<>(std::istream &in, const std::string &inName, YAMATH::MatrixCpu &outVal
     std::string name;
     in >> name;
     in.ignore(1);
-    assert(name == inName);
+    ASSERT(name == inName);
 
     outValue.Load(in);
 

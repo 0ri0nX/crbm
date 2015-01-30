@@ -1,0 +1,37 @@
+Source: crbm-computer-cpu
+Section: szn/libs
+Priority: extra
+Maintainer: Jiří Hroza <jiri.hroza@firma.seznam.cz>
+#X-Python-Version: 2.6
+Build-Depends: debhelper (>= 8.0.0), libblas-dev (>= 1.2)
+Standards-Version: 3.9.3
+
+Package: szn-libcrbmcomputercpu0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: crbm computer library
+ <insert long description, indented with spaces>
+
+Package: szn-libcrbmcomputercpu-dev
+Section: szn/libdevel
+Architecture: any
+Depends: ${misc:Depends}, szn-libcrbmcomputercpu0 (= ${binary:Version})
+Description: crbm computer development files
+ <insert long description, indented with spaces>
+
+Package: szn-libcrbmcomputercpu-example
+Architecture: all
+Section: szn/doc
+Depends: ${misc:Depends}, python-imaging, python-numpy, szn-libcrbmcomputercpu0 (= ${binary:Version}), ${python:Depends}
+Description: crbm-computer example
+ <insert long description, indented with spaces>
+
+Package: python-szn-libcrbmcomputercpu
+Architecture: all
+Section: python
+Depends: ${misc:Depends}, szn-libcrbmcomputercpu0 (= ${binary:Version}), ${python:Depends}
+Provides: ${python:Provides}
+Description: crbm-computer python wrapper
+ <insert long description, indented with spaces>
+
+

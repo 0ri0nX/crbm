@@ -11,7 +11,7 @@
 #include <sstream>
 #include <stdint.h>
 #include <stdint.h>
-#include <cassert>
+#include <cASSERT>
 #include <cstdio>
 #include <stdexcept>
 
@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "myAssert.h"
 #include "matrixCpu.h"
 
 void msgG(const char * inMsg, const YAMATH::MatrixGpu &inM);
@@ -46,13 +47,13 @@ namespace YAMATH
     #define DEB_INIT(a, id)
 #endif
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+#define gpuErrchk(ans) { gpuASSERT((ans), __FILE__, __LINE__); }
+inline void gpuASSERT(cudaError_t code, const char *file, int line, bool abort=true)
 {
    if (code != cudaSuccess) 
    {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      assert(!abort);
+      fprintf(stderr,"GPUASSERT: %s %s %d\n", cudaGetErrorString(code), file, line);
+      ASSERT(!abort);
       if (abort) exit(code);
    }
 }
@@ -70,7 +71,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 #endif
         T *ptr = NULL;
         gpuErrchk(cudaMalloc((void**) &ptr, inNum*sizeof(T)));
-        assert(ptr != NULL);
+        ASSERT(ptr != NULL);
         return ptr;
     }
 
@@ -93,13 +94,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
                 m_Counter(1), m_Data(NULL)
             {
                 //cudaMalloc((void**) &m_Data, inNum*sizeof(T));
-                //assert(m_Data != NULL);
+                //ASSERT(m_Data != NULL);
                 m_Data = allocateGpu<T>(inNum);
             }
 
             ~Holder(void)
             {
-                assert(m_Counter == 0);
+                ASSERT(m_Counter == 0);
                 //cudaFree(m_Data);
                 deallocateGpu<T>(m_Data);
             }
@@ -111,7 +112,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
         public:
             GpuData(t_index inNum = 0)
             {
-                //assert(inNum >= 0);
+                //ASSERT(inNum >= 0);
 
                 if(inNum != 0)
                 {
@@ -368,7 +369,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
             void Reshape(t_index inX, t_index inY)
             {
-                assert(getX()*getY() == inX*inY);
+                ASSERT(getX()*getY() == inX*inY);
 
                 m_X = inX;
                 m_Y = inY;
@@ -535,7 +536,7 @@ int MatrixGpu::m_Allocations = 0;
                 //std::cout << "Mult:" << kA << " vs " << kB << std::endl;
                 //std::cout << " " << m_A.getX() << "x" << m_A.getY() << (inA.isTrans() ? "T" : "") << std::endl;
                 //std::cout << " " << m_B.getX() << "x" << m_B.getY() << (inB.isTrans() ? "T" : "") << std::endl;
-                assert(kA == kB);
+                ASSERT(kA == kB);
             }
 
             virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
@@ -547,7 +548,7 @@ int MatrixGpu::m_Allocations = 0;
 
             virtual void Execute(MatrixGpu &outMatrix) const
             {
-                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+                //ASSERT(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
                 t_index x = !m_A.isTrans() ? m_A.getX() : m_A.getY();
                 t_index y = !m_B.isTrans() ? m_B.getY() : m_B.getX();
@@ -555,14 +556,14 @@ int MatrixGpu::m_Allocations = 0;
                 t_index kB = !m_B.isTrans() ? m_B.getX() : m_B.getY();
 
                 //cout << "TA:" << m_A.isTrans() << ", TB:" << m_B.isTrans() << endl;
-                assert(kA == kB);
+                ASSERT(kA == kB);
 
                 outMatrix.Reset(x, y);
 
                 cublasHandle_t handle;
                 cublasStatus_t stat = cublasCreate(&handle);
 
-                assert (stat == CUBLAS_STATUS_SUCCESS);
+                ASSERT (stat == CUBLAS_STATUS_SUCCESS);
 
                 cublasStatus_t result = cublasSgemm(handle, !m_A.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T, !m_B.isTrans() ? CUBLAS_OP_N : CUBLAS_OP_T,
                         x, y, kA,
@@ -574,7 +575,7 @@ int MatrixGpu::m_Allocations = 0;
                     std::cout << "CUBLAS_STATUS_INVALID_VALUE: "    << (result == CUBLAS_STATUS_INVALID_VALUE    ) << std::endl;
                     std::cout << "CUBLAS_STATUS_ARCH_MISMATCH: "    << (result == CUBLAS_STATUS_ARCH_MISMATCH    ) << std::endl;
                     std::cout << "CUBLAS_STATUS_EXECUTION_FAILED: " << (result == CUBLAS_STATUS_EXECUTION_FAILED ) << std::endl;
-                    assert(0);
+                    ASSERT(0);
                 }
 
                 cublasDestroy(handle);
@@ -674,7 +675,7 @@ int MatrixGpu::m_Allocations = 0;
 
             virtual void Execute(MatrixGpu &outMatrix) const
             {
-                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+                //ASSERT(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
                 outMatrix.Reset(1, 1);
 
@@ -743,8 +744,8 @@ int MatrixGpu::m_Allocations = 0;
                 //{
                 //    cout << "wanted: " << inA.getX() << "x" << inA.getY() << ", got " << inB.getX() << "x" << inB.getY() << endl;
                 //}
-                assert (inA.getX() == inB.getX() && inA.getY() == inB.getY());
-                assert (inA.isTrans() == inB.isTrans());
+                ASSERT (inA.getX() == inB.getX() && inA.getY() == inB.getY());
+                ASSERT (inA.isTrans() == inB.isTrans());
             }
 
             virtual void GetResultSize(t_index &outX, t_index &outY, bool &outTransposed) const
@@ -756,7 +757,7 @@ int MatrixGpu::m_Allocations = 0;
 
             virtual void Execute(MatrixGpu &outMatrix) const
             {
-                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+                //ASSERT(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
                 static t_index ThreadsPerBlock = 512;
 
@@ -865,7 +866,7 @@ int MatrixGpu::m_Allocations = 0;
 
     void testSum(const MatrixGpu& inA, MatrixGpu &outMatrix)
     {
-        assert(0);
+        ASSERT(0);
     }
 
     class OperationMatrixAggregate : public OperationGpu
@@ -885,14 +886,14 @@ int MatrixGpu::m_Allocations = 0;
 
             virtual void Execute(MatrixGpu &outMatrix) const
             {
-                //assert(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
+                //ASSERT(outMatrix.this != m_A.this && outMatrix.this != m_B.this);
 
                 outMatrix.Reset(1, 1);
                 
                 cublasHandle_t handle;
                 cublasStatus_t stat = cublasCreate(&handle);
 
-                assert (stat == CUBLAS_STATUS_SUCCESS);
+                ASSERT (stat == CUBLAS_STATUS_SUCCESS);
 
                 if(m_Type == EA_AbsSum)
                 {
@@ -910,7 +911,7 @@ int MatrixGpu::m_Allocations = 0;
                     //cudaThreadSynchronize();
 
                     //not implemented - cublas int* vs i_index* conflict
-                    assert(0);
+                    ASSERT(0);
 
                     //cout << "MIN_INDEX = " << resIndex << endl;
                 }
@@ -926,7 +927,7 @@ int MatrixGpu::m_Allocations = 0;
                     //cudaThreadSynchronize();
 
                     //not implemented - cublas int* vs i_index* conflict
-                    assert(0);
+                    ASSERT(0);
 
                     //cout << "MAX_INDEX = " << resIndex << endl;
                 }
@@ -1015,8 +1016,8 @@ int MatrixGpu::m_Allocations = 0;
     
     void funcElementwise(MatrixGpu &outMatrix, const MatrixGpu &inMatrix, EFunctionElementwise inType, float inParam1 = 0.0f)
         {
-            assert (inMatrix.getX() == outMatrix.getX());
-            assert (inMatrix.getY() == outMatrix.getY());
+            ASSERT (inMatrix.getX() == outMatrix.getX());
+            ASSERT (inMatrix.getY() == outMatrix.getY());
 
             static t_index ThreadsPerBlock = 512;
 
@@ -1203,7 +1204,7 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator^=(float inExponent)
     {
-        assert(0);
+        ASSERT(0);
         if(inExponent == 2.0f)
         {
             return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f));
@@ -1220,7 +1221,7 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator*=(float inVal)
     {
-        assert(0);
+        ASSERT(0);
         return this->operator=(OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal));
     }
 
@@ -1246,25 +1247,25 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator+=(const MatrixGpu &inB) 
     {
-        assert(0);
+        ASSERT(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Plus));
     }
 
     MatrixGpu &MatrixGpu::operator-=(const MatrixGpu &inB)
     {
-        assert(0);
+        ASSERT(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Minus));
     }
 
     MatrixGpu &MatrixGpu::operator*=(const MatrixGpu &inB)
     {
-        assert(0);
+        ASSERT(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Multiply));
     }
 
     MatrixGpu &MatrixGpu::operator/=(const MatrixGpu &inB)
     {
-        assert(0);
+        ASSERT(0);
         return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide));
     }
 
@@ -1404,7 +1405,7 @@ int MatrixGpu::m_Allocations = 0;
     MatrixCpu &MatrixCpu::operator=(const MatrixGpu &inMatrix)
     {
         Reset(inMatrix.getX(), inMatrix.getY());
-        assert(!inMatrix.isTrans());
+        ASSERT(!inMatrix.isTrans());
         cudaMemcpy(m_Data, inMatrix.getDataConst(), inMatrix.getX()*inMatrix.getY()*sizeof(float), cudaMemcpyDeviceToHost);
 
         return *this;

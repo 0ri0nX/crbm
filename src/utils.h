@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "myAssert.h"
 #include "matrixCpu.h"
 #include <time.h>
 #include <string>

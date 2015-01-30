@@ -1,6 +1,7 @@
 if(CUDA_FOUND)
+    set(CUDA_NVCC_FLAGS -DCUDA)
     CUDA_ADD_LIBRARY(crbmComputerGpu SHARED crbmComputer.cu "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)
-    set_target_properties(crbmComputeGpu PROPERTIES COMPILE_DEFINITIONS CUDA)
+    #set_target_properties(crbmComputeGpu PROPERTIES COMPILE_DEFINITIONS CUDA)
 endif()
 
 add_library(crbmComputerCpu SHARED crbmComputer.cpp "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)

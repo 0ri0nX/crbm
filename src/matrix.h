@@ -479,6 +479,7 @@ inline void gpuASSERT(cudaError_t code, const char *file, int line, bool abort=t
 #endif
 
             friend OperationMatrixMultiply Mult(const MatrixGpu &inA, const MatrixGpu &inB);//matrix multiplication!
+            friend void Swap(MatrixGpu &inA, MatrixGpu &inB);//swap of matrix inner things
     };
 
 #ifdef DEBUG_MATRIX_CLASS
@@ -496,8 +497,14 @@ int MatrixGpu::m_Allocations = 0;
     class OperationGpu
     {
         public:
+            enum OperationBehaviour
+            {
+                OB_OneStep,//if output == param, value of matirx is read and changed in one step therefore no intermediate result is needed (usually elementwise operations)
+                OB_MoreSteps,//if output == param, when output is changed during computation phase incrementally or depends on other elements of is of different size
+            };
 
-            OperationGpu(void)
+            OperationGpu(OperationBehaviour inBehaviour = OB_OneStep)
+                : m_Behaviour(inBehaviour)
             {
                 DEB_CONSTRUCTOR(OperationGpu);
             }
@@ -515,10 +522,17 @@ int MatrixGpu::m_Allocations = 0;
                 DEB_DESTRUCTOR(OperationGpu);
             }
 
+            OperationBehaviour GetBehaviour(void) const
+            {
+                return m_Behaviour;
+            }
+
         protected:
             static const float m_Zero;
             static const float m_One;
             static const float m_MinusOne;
+
+            OperationBehaviour m_Behaviour;
 
     };
 
@@ -530,7 +544,7 @@ int MatrixGpu::m_Allocations = 0;
     {
         public:
             OperationMatrixMultiply(const MatrixGpu& inA, const MatrixGpu& inB)
-                : m_A(inA), m_B(inB)
+                : OperationGpu(OB_MoreSteps), m_A(inA), m_B(inB)
             {
                 t_index kA = !inA.isTrans() ? m_A.getY() : m_A.getX();
                 t_index kB = !inB.isTrans() ? m_B.getX() : m_B.getY();
@@ -663,7 +677,7 @@ int MatrixGpu::m_Allocations = 0;
     {
         public:
             OperationBinaryAssociative(const MatrixGpu& inA, EFunctionBinaryAssociative inType)
-                : m_A(inA), m_Type(inType)
+                : OperationGpu(OB_MoreSteps), m_A(inA), m_Type(inType)
             {
             }
 
@@ -1118,24 +1132,39 @@ int MatrixGpu::m_Allocations = 0;
             bool trans;
             inOperation.GetResultSize(x, y, trans);
 
-            //Init(x, y, trans);
-            MatrixGpu xxx(x, y, trans);
+            if(inOperation.GetBehaviour() == OperationGpu::OB_OneStep)
+            {
+                gpuErrchk( cudaPeekAtLastError() );
+                gpuErrchk( cudaDeviceSynchronize() );
 
-            //TODO:optimization step
-            //OptimizationInfo optInfo;
-            //inOperation.GetOptimizationInfo(optInfo);
-            //OperationGpu newOperation = Optimize(optInfo);
-            //newOperation.Execute(*this);
+                ASSERT(getX() == x && getY() == y && isTrans() == trans);
+                inOperation.Execute(*this);
+
+                gpuErrchk( cudaPeekAtLastError() );
+                gpuErrchk( cudaDeviceSynchronize() );
+            }
+            else if(inOperation.GetBehaviour() == OperationGpu::OB_OneStep)
+            {
+                //Init(x, y, trans);
+                MatrixGpu res(x, y, trans);
+
+                //TODO:optimization step
+                //OptimizationInfo optInfo;
+                //inOperation.GetOptimizationInfo(optInfo);
+                //OperationGpu newOperation = Optimize(optInfo);
+                //newOperation.Execute(*this);
  
-            gpuErrchk( cudaPeekAtLastError() );
-            gpuErrchk( cudaDeviceSynchronize() );
+                gpuErrchk( cudaPeekAtLastError() );
+                gpuErrchk( cudaDeviceSynchronize() );
 
-            //inOperation.Execute(*this);
-            inOperation.Execute(xxx);
-            *this = xxx;
+                //inOperation.Execute(*this);
+                inOperation.Execute(res);
 
-            gpuErrchk( cudaPeekAtLastError() );
-            gpuErrchk( cudaDeviceSynchronize() );
+                Swap(*this, res);
+
+                gpuErrchk( cudaPeekAtLastError() );
+                gpuErrchk( cudaDeviceSynchronize() );
+            }
 
             return *this;
         }
@@ -1170,6 +1199,19 @@ int MatrixGpu::m_Allocations = 0;
         {
             return OperationMatrixMultiply(inA, inB);
         }
+    void Swap(MatrixGpu &inA, MatrixGpu &inB)//swap of matrix inner things
+    {
+        if(&inA != &inB)
+        {
+            std::swap(inA.m_X, inB.m_X);
+            std::swap(inA.m_Y, inB.m_Y);
+
+            swapData(inA.m_Data, inB.m_Data);
+
+            std::swap(inA.m_Transposed, inB.m_Transposed);
+            std::swap(inA.m_ShallowCopy, inB.m_ShallowCopy);
+        }
+    }
 
     OperationMatrixAggregate MatrixGpu::AbsMax(void) const
         {
@@ -1205,25 +1247,27 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator^=(float inExponent)
     {
-        ASSERT(0);
         if(inExponent == 2.0f)
         {
-            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f));
+            (*this) = OperationMatrixApplyElementwise(*this, EFE_Square, 0.0f);
         }
         else if(inExponent == 0.5f)
         {
-            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Sqrt, 0.0f));
+            (*this) = OperationMatrixApplyElementwise(*this, EFE_Sqrt, 0.0f);
         }
         else
         {
-            return this->operator=(OperationMatrixApplyElementwise(*this, EFE_Pow, inExponent));
+            (*this) = OperationMatrixApplyElementwise(*this, EFE_Pow, inExponent);
         }
+
+        return *this;
     }
 
     MatrixGpu &MatrixGpu::operator*=(float inVal)
     {
-        ASSERT(0);
-        return this->operator=(OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal));
+        (*this) = OperationMatrixApplyElementwise(*this, EFE_ScalarMultiply, inVal);
+
+        return *this;
     }
 
     OperationMatrixElementwiseBinary MatrixGpu::operator+(const MatrixGpu &inB) const
@@ -1248,26 +1292,30 @@ int MatrixGpu::m_Allocations = 0;
 
     MatrixGpu &MatrixGpu::operator+=(const MatrixGpu &inB) 
     {
-        ASSERT(0);
-        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Plus));
+        (*this) = OperationMatrixElementwiseBinary(*this, inB, EFEB_Plus);
+
+        return *this;
     }
 
     MatrixGpu &MatrixGpu::operator-=(const MatrixGpu &inB)
     {
-        ASSERT(0);
-        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Minus));
+        (*this) = OperationMatrixElementwiseBinary(*this, inB, EFEB_Minus);
+
+        return *this;
     }
 
     MatrixGpu &MatrixGpu::operator*=(const MatrixGpu &inB)
     {
-        ASSERT(0);
-        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Multiply));
+        (*this) = OperationMatrixElementwiseBinary(*this, inB, EFEB_Multiply);
+
+        return *this;
     }
 
     MatrixGpu &MatrixGpu::operator/=(const MatrixGpu &inB)
     {
-        ASSERT(0);
-        return this->operator=(OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide));
+        (*this) = OperationMatrixElementwiseBinary(*this, inB, EFEB_Divide);
+
+        return *this;
     }
 
 

@@ -4,9 +4,11 @@ if(CUDA_FOUND)
     #add_definitions(-DCUDA)
     cuda_add_executable(crbmGpu crbmGpu.cu matrixCpu.cpp utils.cpp )
     cuda_add_executable(crbmComputeGpu crbmComputeGpu.cu matrixCpu.cpp utils.cpp )
+    cuda_add_executable(testGpu test.cu matrixCpu.cpp utils.cpp )
 
     target_link_libraries(crbmGpu ${CUDA_curand_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} blas rt)
     target_link_libraries(crbmComputeGpu ${CUDA_curand_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} blas rt)
+    target_link_libraries(testGpu ${CUDA_curand_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} blas rt)
 
     #-lcuda -lcublas -lcurand -lcudart
     #remove_definitions(-DCUDA)

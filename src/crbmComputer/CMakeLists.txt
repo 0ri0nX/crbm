@@ -6,6 +6,7 @@ endif()
 add_library(crbmComputerCpu SHARED crbmComputer.cpp "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)
 add_library(crbmComputerCpuStatic STATIC crbmComputer.cpp "${CMAKE_CURRENT_SOURCE_DIR}/../matrixCpu.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/../utils.cpp" crbmComputerBinding.cpp)
 set_target_properties(crbmComputerCpu crbmComputerCpuStatic PROPERTIES COMPILE_DEFINITIONS SQUEEZE)
+set_target_properties(crbmComputerCpuStatic PROPERTIES COMPILE_DEFINITIONS SQUEEZE COMPILE_FLAGS "-fPIC -DPIC")
 
 target_link_libraries(crbmComputerCpu blas rt)
 
